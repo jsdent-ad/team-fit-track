@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTeamStore } from '../store/useTeamStore';
 
-const TEAM_PASSWORD = 'fittrack2026';
+const TEAM_PASSWORD = 'sd2026';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -95,7 +95,7 @@ export default function LoginPage() {
           </button>
 
           <p className="text-xs text-center text-neutral-400 pt-2">
-            힌트: 팀 비밀번호는 <code className="font-mono">fittrack2026</code>
+            힌트: 팀 비밀번호는 <code className="font-mono">sd2026</code>
           </p>
         </form>
       </div>
