@@ -36,3 +36,6 @@ eval-round*-results.json
 # Temp
 /tmp/
 *.tmp
+
+# Claude Code local memory (agent runtime state)
+.claude/
