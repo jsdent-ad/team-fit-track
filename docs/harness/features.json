@@ -1,0 +1,174 @@
+{
+  "project": "Team Fit-Track",
+  "features": [
+    {
+      "id": "F1",
+      "priority": "P0",
+      "name": "팀 로그인 & 사용자 식별",
+      "user_story": "사용자는 팀 비밀번호와 이름으로 앱에 진입할 수 있다.",
+      "acceptance_criteria": [
+        "로그인 화면에서 팀 비밀번호('fittrack2026') + 이름 입력",
+        "비밀번호 불일치 시 에러 메시지 표시",
+        "로그인 성공 시 localStorage에 currentUser 저장 후 메인(/)으로 이동",
+        "이미 로그인된 상태에서 /login 접근 시 메인으로 리다이렉트"
+      ],
+      "screens": ["/login"]
+    },
+    {
+      "id": "F2",
+      "priority": "P0",
+      "name": "팀원/목표 관리 (측정 유형 포함)",
+      "user_story": "사용자는 본인 또는 팀원의 목표치/현재치와 측정 유형(체중/체지방량/골근격량)을 설정하고 수정할 수 있다.",
+      "acceptance_criteria": [
+        "목표 설정 화면에서 이름/측정유형/목표치/현재치/단위 입력",
+        "측정 유형(goalType) 선택 필드: 체중(weight) / 체지방량(bodyFat) / 골격근량(skeletalMuscle) 중 하나 (라디오 또는 Select)",
+        "측정 유형 선택 시 단위 자동 제안 (체중/체지방량/골격근량 모두 kg)",
+        "측정 유형은 멤버 카드와 랭킹 리스트에 라벨/배지 형태로 표시",
+        "새 팀원 추가 버튼으로 멤버 추가 가능",
+        "기존 멤버 수정/삭제 가능 (삭제 시 confirm)",
+        "저장 후 랭킹 점수 자동 재계산",
+        "기존 저장 데이터에 goalType 없으면 'weight'로 마이그레이션"
+      ],
+      "screens": ["/goals"]
+    },
+    {
+      "id": "F3",
+      "priority": "P0",
+      "name": "사진 업로드 + WebP 변환",
+      "user_story": "사용자는 사진을 선택하면 자동으로 WebP로 변환되어 저장된다.",
+      "acceptance_criteria": [
+        "'사진 찍기/선택' 버튼으로 file input 트리거 (capture=environment)",
+        "선택된 이미지가 canvas.toBlob을 통해 image/webp로 변환됨",
+        "변환된 dataURL이 Certification으로 저장되고 점수 +10",
+        "오늘 업로드한 이미지 미리보기가 인증 탭에 표시됨",
+        "캡션(선택) 입력 가능"
+      ],
+      "screens": ["/certify"]
+    },
+    {
+      "id": "F4",
+      "priority": "P0",
+      "name": "실시간 랭킹 대시보드 (Top 3 + 전체 순위)",
+      "user_story": "사용자는 메인에 진입하자마자 팀 Top 3 시상대와 함께 '전체 순위' 리스트(1위, 2위, 3위, ...)를 한 눈에 볼 수 있다.",
+      "acceptance_criteria": [
+        "상단: Top 3 시상대 카드 (1위 금메달 🥇, 2위 은메달 🥈, 3위 동메달 🥉) — 이름 + 종합 점수",
+        "중단: 내 점수 카드 (목표 점수 / 인증 점수 / 합계 각각 표시)",
+        "하단: '전체 순위' 섹션 — 모든 멤버를 종합 점수 내림차순으로 나열",
+        "전체 순위 각 행: '1', '2', '3'... 숫자 뱃지 + 이름 + 측정유형 라벨 + 점수",
+        "현재 로그인 사용자 행은 accent 테두리로 하이라이트",
+        "데이터 변경 시 즉시 반영 (Zustand 구독)",
+        "빈 상태: 멤버가 0명일 때 '팀원을 추가하세요' 안내 + /goals 링크",
+        "멤버 3명 미만이어도 Top N만 표시되고 전체 순위 섹션은 정상 동작"
+      ],
+      "screens": ["/"]
+    },
+    {
+      "id": "F5",
+      "priority": "P0",
+      "name": "팀 기록 리스트 (수정/삭제)",
+      "user_story": "사용자는 팀원 전체의 인증 기록을 확인하고 누구의 기록이든 수정/삭제할 수 있다.",
+      "acceptance_criteria": [
+        "전체 인증 기록을 최신순으로 표시 (멤버명, 이미지 썸네일, 시각, 캡션)",
+        "각 레코드에 수정/삭제 아이콘",
+        "삭제 시 confirm('정말 삭제하시겠습니까?') 팝업",
+        "삭제 확인 후 해당 멤버 인증 점수 -10 재계산",
+        "캡션 수정 가능"
+      ],
+      "screens": ["/records"]
+    },
+    {
+      "id": "F6",
+      "priority": "P0",
+      "name": "localStorage 영속화",
+      "user_story": "사용자는 새로고침 후에도 모든 데이터가 유지됨을 확인할 수 있다.",
+      "acceptance_criteria": [
+        "Zustand persist 미들웨어로 members/certifications/currentUser 저장",
+        "새로고침 시 동일한 상태 복원",
+        "저장 키 네임스페이스: 'teamfit-v1'"
+      ],
+      "screens": ["all"]
+    },
+    {
+      "id": "F7",
+      "priority": "P0",
+      "name": "하단 탭 네비게이션",
+      "user_story": "사용자는 하단 탭으로 4개 화면을 빠르게 이동할 수 있다.",
+      "acceptance_criteria": [
+        "하단 고정 탭바: 랭킹(홈) / 인증 / 기록 / 목표",
+        "현재 경로에 해당하는 탭 강조 (일렉트릭 블루)",
+        "아이콘 + 라벨 조합, 최소 터치 영역 48px"
+      ],
+      "screens": ["all"]
+    },
+    {
+      "id": "F8",
+      "priority": "P1",
+      "name": "빈 상태 & 에러 처리",
+      "user_story": "사용자는 데이터가 없거나 문제가 생겨도 명확한 안내를 받는다.",
+      "acceptance_criteria": [
+        "멤버 0명, 인증 0개 등 빈 상태에 일러스트/메시지",
+        "사진 용량 10MB 초과 시 알림",
+        "목표치 0 이하 입력 시 유효성 검사 메시지"
+      ],
+      "screens": ["/", "/certify", "/records", "/goals"]
+    },
+    {
+      "id": "F9",
+      "priority": "P1",
+      "name": "디자인 완성도 (Pretendard + 일렉트릭 블루)",
+      "user_story": "사용자는 깔끔하고 활기찬 UI를 경험한다.",
+      "acceptance_criteria": [
+        "Pretendard 폰트 CDN 적용",
+        "강조색 #0066FF만 사용, 나머지는 무채색",
+        "버튼/카드 모서리 radius 일관성",
+        "AI 뻔한 그라데이션/보라색 패턴 금지"
+      ],
+      "screens": ["all"]
+    },
+    {
+      "id": "F10",
+      "priority": "P2",
+      "name": "목표 달성 축하 애니메이션",
+      "user_story": "사용자는 목표 점수 100 달성 시 축하 효과를 확인할 수 있다.",
+      "acceptance_criteria": [
+        "멤버의 goalCurrent가 goalTarget에 도달(goalScore === 100)하는 순간 1회 축하 모달 표시",
+        "Confetti 버스트 애니메이션(2~3초) + '목표 달성! 🎉 {이름}' 메시지",
+        "이미 달성한 멤버는 재진입 시 중복 표시 금지 (localStorage에 celebratedMemberIds 기록)",
+        "모달에는 '확인' 버튼과 공유용 요약 텍스트(이름/목표/단위)",
+        "애니메이션은 CSS 또는 canvas-confetti 라이브러리 둘 중 하나 사용"
+      ],
+      "screens": ["/", "/goals"]
+    },
+    {
+      "id": "F11",
+      "priority": "P2",
+      "name": "주간 인증 추이 차트",
+      "user_story": "사용자는 지난 7일간 팀 인증 개수와 내 인증 개수를 차트로 볼 수 있다.",
+      "acceptance_criteria": [
+        "메인 또는 별도 탭에 주간 차트 표시 (Recharts 또는 순수 SVG)",
+        "X축: 최근 7일(오늘 포함, 요일 라벨 월~일)",
+        "Y축: 인증 개수",
+        "2개 시리즈: '팀 전체' + '내 기록' 겹쳐 표시 (선 또는 막대)",
+        "데이터 0일 때 '이번 주 기록이 없어요' empty state",
+        "범례(legend) + 툴팁(hover 시 수치)"
+      ],
+      "screens": ["/"]
+    },
+    {
+      "id": "F12",
+      "priority": "P2",
+      "name": "팀 챌린지 / 테마 목표",
+      "user_story": "사용자는 월간 팀 공통 목표(예: 팀 전체 인증 300건)를 설정하고 진행률을 확인할 수 있다.",
+      "acceptance_criteria": [
+        "/goals 페이지 상단에 '팀 챌린지' 섹션 추가",
+        "팀 챌린지 객체: { title, targetCount, themeEmoji, startDate, endDate }",
+        "진행률 = (기간 내 전체 certifications 수 / targetCount) * 100, 100 상한",
+        "진행률 바 + 숫자(예: 120/300 = 40%) 표시",
+        "현재 활성화된 챌린지가 없으면 '챌린지 시작하기' 버튼",
+        "챌린지 삭제 버튼(confirm 필수)",
+        "챌린지는 persist에 포함 (key 동일)"
+      ],
+      "screens": ["/goals", "/"]
+    }
+  ]
+}

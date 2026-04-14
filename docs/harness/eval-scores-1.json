@@ -1,0 +1,92 @@
+{
+  "round": 1,
+  "overall_score": 8.15,
+  "pass": true,
+  "criteria": {
+    "Design & UI": {
+      "score": 8,
+      "notes": "Pretendard font verified via getComputedStyle ('Pretendard, system-ui, -apple-system, sans-serif'). Electric blue (#0066FF) used consistently as the only accent. White bg + neutral-900/500 text — no purple/gradient AI slop. Bottom tab active state correctly shows accent color (rgb(0,102,255) confirmed). Mobile 390px layout scrolls cleanly; desktop 1280px centered via max-w-xl. Touch targets ≥48px. Highlighted current user card on ranking is a nice touch. Minor: no list-reorder animations on ranking changes; desktop layout is literally just mobile centered (acceptable for MVP, but feels unused on wide viewports)."
+    },
+    "Functionality": {
+      "score": 9,
+      "notes": "All P0 features verified end-to-end via Playwright. F1 login: empty/wrong/correct paths all behave correctly; re-entry to /login redirects. F2: add, edit, delete (with ConfirmDialog), validation (target<=0 rejected). F3: real canvas-generated PNG uploaded; preview and stored dataURL both confirmed 'data:image/webp' prefix; +10 score applied (Alice total = 86+10 = 96 exactly as formula predicts). F4: Top3 ordering verified with seeded data (Bob 100 > Alice 96 > Carol 10). F5: caption edit persists, delete goes through ConfirmDialog and decrements cert count. F7: all 4 tabs navigate; active color correct. Score formulas: goalScore round(60/70*100)=86 confirmed, certScore length*10 confirmed. Zero console errors across all tested flows."
+    },
+    "Craft": {
+      "score": 7,
+      "notes": "Custom ConfirmDialog (not window.confirm) — supports ESC key, backdrop-click cancel, clear destructive styling. Submit buttons toggle disabled + label text swap. Empty states present on /goals, /records, / (ranking) with guidance. 404 route redirects via <Route path='*'>. active:scale-95 on primary buttons for touch feedback. Missing: no skeleton loaders (minor, data is local), no ranking re-order transition, dedicated 404 screen absent (redirect only). No loading spinner icons, just text swap. Overall solid but not exceptional."
+    },
+    "Data Integrity": {
+      "score": 9,
+      "notes": "Zustand persist with 'teamfit-v1' key + partialize verified in localStorage. Reload test: member persisted across hard reload. Cascade delete implemented in removeMember (filters certifications by memberId). Validation: target<=0, current<0, non-finite all blocked in GoalsPage validate(). image.ts validates 10MB cap and file.type image prefix. onRehydrateStorage catches corruption and resets. UUIDs via crypto.randomUUID with fallback. Score recomputation is pure (derived each render) so no stale cache. Could improve: no explicit schema version migration plan if models change, but 'teamfit-v1' naming leaves room."
+    }
+  },
+  "console_errors_count": 0,
+  "weighted_calc": {
+    "formula": "Design 8*0.25 + Functionality 9*0.30 + Craft 7*0.20 + Data 9*0.25",
+    "value": 8.35,
+    "note": "Slightly conservative overall_score 8.15 accounting for unverified edge cases (offline usage, very large images beyond 10MB, concurrent multi-tab edits)."
+  },
+  "blocking_issues": [],
+  "non_blocking_issues": [
+    {
+      "id": "N1",
+      "severity": "low",
+      "area": "Design & UI",
+      "title": "Desktop viewport underutilized",
+      "repro": "Open /, /records, /goals at 1280px — content is just a centered max-w-xl column with large empty margins",
+      "expected": "Either a multi-column layout on desktop, or a clear mobile-frame mock on wide viewports to signal this is a mobile-first app",
+      "observed": "Narrow centered column; visually sparse"
+    },
+    {
+      "id": "N2",
+      "severity": "low",
+      "area": "Craft",
+      "title": "No ranking re-order animation",
+      "repro": "Add a certification to a lower-ranked member to bump them up — list reorders instantly",
+      "expected": "Subtle transform/fade transition on rank changes to make score gains feel rewarding",
+      "observed": "Instant swap"
+    },
+    {
+      "id": "N3",
+      "severity": "low",
+      "area": "Craft",
+      "title": "No dedicated 404 screen",
+      "repro": "Visit /nonexistent",
+      "expected": "Either a clear 404 card or, at minimum, a redirect message",
+      "observed": "Silent redirect to / (logged in) or /login — works but no user feedback"
+    },
+    {
+      "id": "N4",
+      "severity": "low",
+      "area": "Functionality",
+      "title": "Login submit button shows 'submitting' briefly but useEffect navigate is slightly delayed",
+      "repro": "Click '로그인' with correct credentials",
+      "expected": "Immediate navigate after login (feels crisp)",
+      "observed": "Brief re-render cycle — login() sets state, then useEffect sees currentUser and navigates. Works but slightly less imperative. Not a bug."
+    },
+    {
+      "id": "N5",
+      "severity": "low",
+      "area": "Data Integrity",
+      "title": "CurrentUser name casing inconsistency tolerance",
+      "repro": "Login as 'alice', create Alice member via /goals (capital A), then ranking highlights alice",
+      "expected": "Case-insensitive matching is already implemented — OK. But the displayed currentUser name stays as the original casing typed at login, which may look odd next to the Member's cased name",
+      "observed": "Works, minor UX ambiguity"
+    }
+  ],
+  "test_summary": {
+    "tests_passed": 31,
+    "tests_failed": 0,
+    "categories": {
+      "T1_login": "5/5",
+      "T2_members_goals": "8/8",
+      "T3_photo_upload_webp": "4/4",
+      "T4_ranking": "2/2",
+      "T5_records": "5/5",
+      "T6_persistence": "1/1",
+      "T7_bottom_tabs": "5/5",
+      "T8_design_font": "1/1"
+    }
+  },
+  "screenshots_dir": "C:\\myunji\\sd_gym\\docs\\harness\\screenshots\\round1\\"
+}

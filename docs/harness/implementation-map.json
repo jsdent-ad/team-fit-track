@@ -1,0 +1,91 @@
+{
+  "round": 2,
+  "project": "Team Fit-Track",
+  "build": "tsc -b && vite build → success, 0 TS errors",
+  "dev_server": "http://localhost:5173 → 200",
+  "dependencies_added": {
+    "canvas-confetti": "^1.x",
+    "@types/canvas-confetti": "^1.x (dev)",
+    "recharts": "^3.x"
+  },
+  "store_changes": {
+    "file": "app/src/store/useTeamStore.ts",
+    "version_bump": "persist version 1 → 2",
+    "new_types": [
+      "GoalType = 'weight' | 'bodyFat' | 'skeletalMuscle'",
+      "TeamChallenge = { id, title, targetCount, themeEmoji, startDate, endDate }"
+    ],
+    "new_state": [
+      "celebratedMemberIds: string[]",
+      "teamChallenge: TeamChallenge | null"
+    ],
+    "new_actions": ["markCelebrated", "setTeamChallenge"],
+    "migrate": "v1 → v2: inject goalType='weight' on existing members, init celebratedMemberIds=[], teamChallenge=null",
+    "celebration_reset_policy": "If updateMember drops member below 100% (or target invalid), the id is removed from celebratedMemberIds so a re-achievement re-triggers the modal. Documented in CelebrationModal.tsx."
+  },
+  "features_implemented": [
+    {
+      "id": "F2",
+      "status": "extended",
+      "changes": [
+        "Member.goalType added (radio with 체중/체지방량/골격근량 in GoalsPage)",
+        "Default unit suggestion (kg) on type change",
+        "MemberCard + ranking list show goalType badge",
+        "Migration auto-fills 'weight' for legacy data"
+      ]
+    },
+    {
+      "id": "F4",
+      "status": "extended",
+      "changes": [
+        "Top 3 podium kept",
+        "My Score card kept",
+        "New '전체 순위' section: numbered badges 1, 2, 3, ... + name + goalType badge + score",
+        "Current user row highlighted with accent border",
+        "Desktop md: layout — My Score & Top 3 side-by-side; full ranking and chart full-width below"
+      ]
+    },
+    {
+      "id": "F10",
+      "status": "added",
+      "files": ["app/src/components/CelebrationModal.tsx", "app/src/App.tsx"],
+      "details": "canvas-confetti burst (~2.5s) from both bottom corners + center modal '목표 달성! 🎉 {name}' with 측정유형 + 수치. App-level CelebrationWatcher subscribes to members, fires once per id, marks via store.markCelebrated."
+    },
+    {
+      "id": "F11",
+      "status": "added",
+      "files": ["app/src/components/WeeklyChart.tsx"],
+      "details": "recharts LineChart, last 7 days (incl. today), X-axis weekday + MM/DD, two series '팀 전체' (#0066FF) and '내 기록' (#9CA3AF), tooltip + legend, empty state '이번 주 기록이 없어요'. Placed under '전체 순위' on RankingPage."
+    },
+    {
+      "id": "F12",
+      "status": "added",
+      "files": [
+        "app/src/components/TeamChallengeSection.tsx",
+        "app/src/components/ChallengeBadge.tsx"
+      ],
+      "details": "GoalsPage top section: create form (title/targetCount/themeEmoji/startDate/endDate) → active card with progress bar (count/target · %), period MM/DD ~ MM/DD, delete with confirm. Progress = certifications within [startDate, endDate] / targetCount × 100, capped at 100. RankingPage shows compact ChallengeBadge above the My Score/Top 3 row."
+    },
+    {
+      "id": "N3",
+      "status": "added",
+      "files": ["app/src/pages/NotFoundPage.tsx", "app/src/App.tsx"],
+      "details": "Catch-all route '*' now renders NotFoundPage with 404 + '홈으로 돌아가기' CTA."
+    },
+    {
+      "id": "N1",
+      "status": "added",
+      "details": "RankingPage uses max-w-5xl + md:grid md:grid-cols-2 md:gap-6 for My Score/Top 3, full-width sections for ranking list and weekly chart."
+    }
+  ],
+  "regression_check": [
+    "Login flow unchanged",
+    "ensureMemberForUser auto-creates with goalType='weight' & unit='kg' (was empty unit)",
+    "Cascade delete also clears celebratedMemberIds entry",
+    "Score formulas unchanged"
+  ],
+  "known_issues": [
+    "vite build warning: bundle > 500kB (recharts is the bulk). Not blocking.",
+    "Celebration trigger uses goalScore===100 strictly; floats that round to 100 also fire (consistent with score formula)."
+  ]
+}

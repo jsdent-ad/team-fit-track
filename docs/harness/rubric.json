@@ -1,0 +1,64 @@
+{
+  "project_type": "webapp",
+  "pass_threshold": 7,
+  "criteria": [
+    {
+      "name": "Design & UI",
+      "weight": 0.25,
+      "threshold": 7,
+      "description": "시각적 품질, 일관성, 사용자 경험",
+      "checklist": [
+        "Pretendard 폰트가 실제 적용됨 (devtools 확인)",
+        "일렉트릭 블루(#0066FF) 강조색 + 흰색 배경 + 무채색 텍스트 일관성",
+        "AI 뻔한 패턴(보라 그라데이션, 흰 카드 위 흰 카드) 없음",
+        "하단 탭바 현재 탭 하이라이트 정확",
+        "버튼 터치 영역 최소 48px",
+        "모바일 뷰포트(375px)에서 가독성/레이아웃 유지"
+      ]
+    },
+    {
+      "name": "Functionality",
+      "weight": 0.30,
+      "threshold": 7,
+      "description": "P0 기능 전체 동작 검증",
+      "checklist": [
+        "F1: 잘못된 비밀번호 거부 + 올바른 비밀번호 진입",
+        "F2: 팀원 추가 → 수정 → 삭제(confirm) 정상",
+        "F3: 이미지 선택 → WebP 변환(blob.type === 'image/webp') → 저장 + 점수 +10",
+        "F4: Top 3 랭킹이 종합 점수 내림차순으로 표시",
+        "F5: 기록 삭제 시 confirm + 해당 멤버 점수 -10 반영",
+        "F7: 하단 탭으로 4개 화면 이동 가능",
+        "목표 점수 공식: min(100, (current/target)*100) 정확",
+        "인증 점수 공식: certifications.length * 10 정확",
+        "콘솔 에러 0개 (경고는 허용)"
+      ]
+    },
+    {
+      "name": "Craft",
+      "weight": 0.20,
+      "threshold": 6,
+      "description": "완성도, 세밀함",
+      "checklist": [
+        "로딩 중 버튼 disabled + 스피너/텍스트 전환",
+        "빈 상태 메시지 (멤버/인증 0개)",
+        "삭제 confirm 팝업 필수 적용",
+        "애니메이션/트랜지션 자연스러움 (랭킹 변경, 탭 전환)",
+        "404 또는 잘못된 경로 접근 시 리다이렉트/안내",
+        "터치 피드백 (active 상태)"
+      ]
+    },
+    {
+      "name": "Data Integrity",
+      "weight": 0.25,
+      "threshold": 7,
+      "description": "데이터 정합성 / 영속성",
+      "checklist": [
+        "F6: 새로고침 후 members, certifications, currentUser 유지",
+        "멤버 삭제 시 해당 멤버의 certifications도 cascade 삭제",
+        "목표치 0 이하, NaN 방지 유효성 검사",
+        "잘못된 localStorage 데이터 감지 시 안전한 초기화",
+        "점수 재계산이 데이터 변경 직후 즉시 반영"
+      ]
+    }
+  ]
+}
