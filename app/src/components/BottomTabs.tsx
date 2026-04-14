@@ -73,7 +73,7 @@ export default function BottomTabs() {
     >
       <ul className="flex items-stretch justify-around max-w-xl mx-auto">
         {tabs.map((t) => (
-          <li key={t.to} className="flex-1">
+          <li key={t.to} className="flex-1" data-tab={t.to}>
             <NavLink
               to={t.to}
               end={t.to === '/'}

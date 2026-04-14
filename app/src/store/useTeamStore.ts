@@ -54,6 +54,7 @@ export interface TeamState {
   members: Member[];
   certifications: Certification[];
   celebratedMemberIds: string[];
+  tourCompletedMemberIds: string[];
   teamChallenge: TeamChallenge | null;
 
   // Auth
@@ -84,6 +85,7 @@ export interface TeamState {
   getCurrentMember: () => Member | undefined;
   getMemberByName: (name: string) => Member | undefined;
   markCelebrated: (memberId: string) => void;
+  markTourCompleted: (memberId: string) => void;
   setTeamChallenge: (c: TeamChallenge | null) => void;
 }
 
@@ -126,6 +128,7 @@ export const useTeamStore = create<TeamState>()(
       members: [],
       certifications: [],
       celebratedMemberIds: [],
+      tourCompletedMemberIds: [],
       teamChallenge: null,
 
       signup: async ({ name, password, goalType, goalStart, goalTarget, goalCurrent, goalUnit }) => {
@@ -279,6 +282,13 @@ export const useTeamStore = create<TeamState>()(
             : { celebratedMemberIds: [...s.celebratedMemberIds, memberId] }
         ),
 
+      markTourCompleted: (memberId) =>
+        set((s) =>
+          s.tourCompletedMemberIds.includes(memberId)
+            ? s
+            : { tourCompletedMemberIds: [...s.tourCompletedMemberIds, memberId] }
+        ),
+
       setTeamChallenge: (c) => set({ teamChallenge: c }),
     }),
     {
@@ -290,6 +300,7 @@ export const useTeamStore = create<TeamState>()(
         members: state.members,
         certifications: state.certifications,
         celebratedMemberIds: state.celebratedMemberIds,
+        tourCompletedMemberIds: state.tourCompletedMemberIds,
         teamChallenge: state.teamChallenge,
       }),
       migrate: (persistedState: unknown, version: number) => {
@@ -348,6 +359,7 @@ export const useTeamStore = create<TeamState>()(
         if (!Array.isArray(state.members)) state.members = [];
         if (!Array.isArray(state.certifications)) state.certifications = [];
         if (!Array.isArray(state.celebratedMemberIds)) state.celebratedMemberIds = [];
+        if (!Array.isArray(state.tourCompletedMemberIds)) state.tourCompletedMemberIds = [];
         state.members = state.members.map((m) => {
           const mm = m as Member;
           return {

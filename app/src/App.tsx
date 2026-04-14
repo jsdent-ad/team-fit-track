@@ -4,6 +4,7 @@ import { useTeamStore, type Member } from './store/useTeamStore';
 import { goalScore } from './store/score';
 import BottomTabs from './components/BottomTabs';
 import CelebrationModal from './components/CelebrationModal';
+import OnboardingTour from './components/OnboardingTour';
 import LoginPage from './pages/LoginPage';
 import RankingPage from './pages/RankingPage';
 import CertifyPage from './pages/CertifyPage';
@@ -43,6 +44,14 @@ function CelebrationWatcher() {
       onClose={() => setCelebrating(null)}
     />
   );
+}
+
+function TourGate() {
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
+  const tourCompletedMemberIds = useTeamStore((s) => s.tourCompletedMemberIds);
+  const markTourCompleted = useTeamStore((s) => s.markTourCompleted);
+  if (!currentMemberId || tourCompletedMemberIds.includes(currentMemberId)) return null;
+  return <OnboardingTour onDone={() => markTourCompleted(currentMemberId)} />;
 }
 
 export default function App() {
@@ -90,6 +99,7 @@ export default function App() {
       </Routes>
       {currentMemberId && <BottomTabs />}
       {currentMemberId && <CelebrationWatcher />}
+      {currentMemberId && <TourGate />}
     </div>
   );
 }
