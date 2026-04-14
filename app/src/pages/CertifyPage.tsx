@@ -111,7 +111,6 @@ export default function CertifyPage() {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             className="hidden"
             onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
           />
