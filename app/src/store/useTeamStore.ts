@@ -19,6 +19,7 @@ export type Member = {
   id: string;
   name: string;
   goalType: GoalType;
+  goalStart: number;
   goalTarget: number;
   goalCurrent: number;
   goalUnit: string;
@@ -61,6 +62,17 @@ export interface TeamState {
   setTeamChallenge: (c: TeamChallenge | null) => void;
 }
 
+function computeGoalScore(m: Member): number {
+  const target = Number.isFinite(m.goalTarget) ? m.goalTarget : 0;
+  const current = Number.isFinite(m.goalCurrent) ? m.goalCurrent : 0;
+  const start = Number.isFinite(m.goalStart) ? m.goalStart : current;
+  const diff = target - start;
+  if (!Number.isFinite(diff) || Math.abs(diff) < 1e-9) return 0;
+  const pct = ((current - start) / diff) * 100;
+  if (!Number.isFinite(pct)) return 0;
+  return Math.min(100, Math.max(0, Math.round(pct)));
+}
+
 function uuid(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -81,12 +93,15 @@ export const useTeamStore = create<TeamState>()(
       logout: () => set({ currentUser: null }),
 
       addMember: (m) => {
+        const goalCurrent = Number.isFinite(m.goalCurrent) ? m.goalCurrent : 0;
+        const goalStart = Number.isFinite(m.goalStart) ? m.goalStart : goalCurrent;
         const newMember: Member = {
           id: uuid(),
           name: m.name.trim(),
           goalType: m.goalType ?? 'weight',
+          goalStart,
           goalTarget: Number.isFinite(m.goalTarget) ? m.goalTarget : 0,
-          goalCurrent: Number.isFinite(m.goalCurrent) ? m.goalCurrent : 0,
+          goalCurrent,
           goalUnit: m.goalUnit || '',
         };
         set((s) => ({ members: [...s.members, newMember] }));
@@ -94,22 +109,15 @@ export const useTeamStore = create<TeamState>()(
       },
 
       updateMember: (id, patch) =>
-        set((s) => ({
-          members: s.members.map((m) => (m.id === id ? { ...m, ...patch } : m)),
-          // If goal changes such that the member is no longer at 100, allow future celebration again.
-          // We choose to REMOVE the id from celebrated list when updated so a re-achievement re-triggers.
-          celebratedMemberIds: s.celebratedMemberIds.filter((cid) => {
-            if (cid !== id) return true;
-            const next = { ...s.members.find((mm) => mm.id === id), ...patch } as Member | undefined;
-            if (!next) return true;
-            const target = Number.isFinite(next.goalTarget) ? next.goalTarget : 0;
-            const current = Number.isFinite(next.goalCurrent) ? next.goalCurrent : 0;
-            if (!target || target <= 0) return false; // unreachable → reset
-            const pct = Math.min(100, Math.max(0, Math.round((current / target) * 100)));
-            // keep marked only if still at 100
-            return pct === 100;
-          }),
-        })),
+        set((s) => {
+          const members = s.members.map((m) => (m.id === id ? { ...m, ...patch } : m));
+          const next = members.find((m) => m.id === id);
+          const celebratedMemberIds = s.celebratedMemberIds.filter((cid) => {
+            if (cid !== id || !next) return true;
+            return computeGoalScore(next) === 100;
+          });
+          return { members, celebratedMemberIds };
+        }),
 
       removeMember: (id) =>
         set((s) => ({
@@ -153,6 +161,7 @@ export const useTeamStore = create<TeamState>()(
         return get().addMember({
           name,
           goalType: 'weight',
+          goalStart: 0,
           goalTarget: 0,
           goalCurrent: 0,
           goalUnit: 'kg',
@@ -170,7 +179,7 @@ export const useTeamStore = create<TeamState>()(
     }),
     {
       name: 'teamfit-v1',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         currentUser: state.currentUser,
@@ -191,6 +200,16 @@ export const useTeamStore = create<TeamState>()(
           if (!Array.isArray(state.celebratedMemberIds)) state.celebratedMemberIds = [];
           if (!('teamChallenge' in state)) state.teamChallenge = null;
         }
+        if (version < 3) {
+          if (Array.isArray(state.members)) {
+            state.members = (state.members as Array<Record<string, unknown>>).map((m) => {
+              const current = typeof m.goalCurrent === 'number' ? m.goalCurrent : 0;
+              return { ...m, goalStart: typeof m.goalStart === 'number' ? m.goalStart : current };
+            });
+          }
+          // Reset celebration state — previous entries were based on the buggy formula.
+          state.celebratedMemberIds = [];
+        }
         return state as unknown as TeamState;
       },
       onRehydrateStorage: () => (state, error) => {
@@ -208,11 +227,18 @@ export const useTeamStore = create<TeamState>()(
         if (!Array.isArray(state.members)) state.members = [];
         if (!Array.isArray(state.certifications)) state.certifications = [];
         if (!Array.isArray(state.celebratedMemberIds)) state.celebratedMemberIds = [];
-        // Ensure goalType on each member (defensive, in case migrate was skipped)
-        state.members = state.members.map((m) => ({
-          ...m,
-          goalType: (m as Member).goalType ?? 'weight',
-        }));
+        // Ensure goalType + goalStart on each member (defensive, in case migrate was skipped)
+        state.members = state.members.map((m) => {
+          const mm = m as Member;
+          return {
+            ...m,
+            goalType: mm.goalType ?? 'weight',
+            goalStart:
+              typeof mm.goalStart === 'number' && Number.isFinite(mm.goalStart)
+                ? mm.goalStart
+                : mm.goalCurrent,
+          };
+        });
         if (typeof state.teamChallenge === 'undefined') state.teamChallenge = null;
       },
     }

@@ -13,6 +13,7 @@ import TeamChallengeSection from '../components/TeamChallengeSection';
 type Draft = {
   name: string;
   goalType: GoalType;
+  goalStart: string;
   goalTarget: string;
   goalCurrent: string;
   goalUnit: string;
@@ -21,6 +22,7 @@ type Draft = {
 const emptyDraft: Draft = {
   name: '',
   goalType: 'weight',
+  goalStart: '',
   goalTarget: '',
   goalCurrent: '',
   goalUnit: 'kg',
@@ -32,6 +34,11 @@ function validate(draft: Draft): string | null {
   const current = Number(draft.goalCurrent);
   if (!Number.isFinite(target) || target <= 0) return '목표치는 0보다 커야 합니다';
   if (!Number.isFinite(current) || current < 0) return '현재치는 0 이상이어야 합니다';
+  if (draft.goalStart.trim() !== '') {
+    const start = Number(draft.goalStart);
+    if (!Number.isFinite(start) || start < 0) return '시작치는 0 이상이어야 합니다';
+    if (Math.abs(start - target) < 1e-9) return '시작치와 목표치가 같으면 진행률을 계산할 수 없어요';
+  }
   return null;
 }
 
@@ -77,6 +84,7 @@ function MemberRow({ member }: { member: Member }) {
   const [draft, setDraft] = useState<Draft>({
     name: member.name,
     goalType: member.goalType ?? 'weight',
+    goalStart: String(member.goalStart ?? member.goalCurrent ?? ''),
     goalTarget: String(member.goalTarget || ''),
     goalCurrent: String(member.goalCurrent || ''),
     goalUnit: member.goalUnit || '',
@@ -92,11 +100,15 @@ function MemberRow({ member }: { member: Member }) {
       return;
     }
     setError(null);
+    const currentNum = Number(draft.goalCurrent);
+    const startNum =
+      draft.goalStart.trim() === '' ? currentNum : Number(draft.goalStart);
     updateMember(member.id, {
       name: draft.name.trim(),
       goalType: draft.goalType,
+      goalStart: startNum,
       goalTarget: Number(draft.goalTarget),
-      goalCurrent: Number(draft.goalCurrent),
+      goalCurrent: currentNum,
       goalUnit: draft.goalUnit.trim(),
     });
     setEditing(false);
@@ -113,7 +125,7 @@ function MemberRow({ member }: { member: Member }) {
             </span>
           </div>
           <p className="text-xs text-neutral-500 mt-0.5">
-            {member.goalCurrent} / {member.goalTarget} {member.goalUnit} · 목표 {goalScore(member)}점 · 인증 {certsCount * 10}점
+            시작 {member.goalStart ?? member.goalCurrent} → 현재 {member.goalCurrent} / 목표 {member.goalTarget} {member.goalUnit} · 목표 {goalScore(member)}점 · 인증 {certsCount * 10}점
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -162,7 +174,17 @@ function MemberRow({ member }: { member: Member }) {
               />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
+            <label className="block col-span-1">
+              <span className="text-xs text-neutral-500">시작치</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={draft.goalStart}
+                onChange={(e) => setDraft({ ...draft, goalStart: e.target.value })}
+                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+              />
+            </label>
             <label className="block col-span-1">
               <span className="text-xs text-neutral-500">현재치</span>
               <input
@@ -238,11 +260,15 @@ export default function GoalsPage() {
       return;
     }
     setError(null);
+    const currentNum = Number(draft.goalCurrent);
+    const startNum =
+      draft.goalStart.trim() === '' ? currentNum : Number(draft.goalStart);
     addMember({
       name: draft.name.trim(),
       goalType: draft.goalType,
+      goalStart: startNum,
       goalTarget: Number(draft.goalTarget),
-      goalCurrent: Number(draft.goalCurrent),
+      goalCurrent: currentNum,
       goalUnit: draft.goalUnit.trim() || GOAL_TYPE_DEFAULT_UNIT[draft.goalType],
     });
     setDraft(emptyDraft);
@@ -297,7 +323,21 @@ export default function GoalsPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <p className="text-[11px] text-neutral-400 leading-relaxed">
+            시작치는 생략하면 현재치가 자동 기준이 돼요. 진행률 = (현재 − 시작) / (목표 − 시작).
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            <label className="block col-span-1">
+              <span className="text-xs text-neutral-500">시작치</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={draft.goalStart}
+                onChange={(e) => setDraft({ ...draft, goalStart: e.target.value })}
+                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+                placeholder="선택"
+              />
+            </label>
             <label className="block col-span-1">
               <span className="text-xs text-neutral-500">현재치</span>
               <input

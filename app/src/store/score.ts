@@ -1,9 +1,12 @@
 import type { Certification, Member } from './useTeamStore';
 
 export function goalScore(m: Member): number {
-  if (!m.goalTarget || m.goalTarget <= 0 || !Number.isFinite(m.goalTarget)) return 0;
+  const target = Number.isFinite(m.goalTarget) ? m.goalTarget : 0;
   const current = Number.isFinite(m.goalCurrent) ? m.goalCurrent : 0;
-  const pct = (current / m.goalTarget) * 100;
+  const start = Number.isFinite(m.goalStart) ? m.goalStart : current;
+  const diff = target - start;
+  if (!Number.isFinite(diff) || Math.abs(diff) < 1e-9) return 0;
+  const pct = ((current - start) / diff) * 100;
   if (!Number.isFinite(pct)) return 0;
   return Math.min(100, Math.max(0, Math.round(pct)));
 }
