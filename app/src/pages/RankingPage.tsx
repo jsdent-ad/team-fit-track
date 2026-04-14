@@ -9,6 +9,8 @@ export default function RankingPage() {
   const members = useTeamStore((s) => s.members);
   const certifications = useTeamStore((s) => s.certifications);
   const currentMemberId = useTeamStore((s) => s.currentMemberId);
+  const teamName = useTeamStore((s) => s.currentTeamName);
+  const teamCode = useTeamStore((s) => s.currentTeamCode);
   const logout = useTeamStore((s) => s.logout);
 
   const rows = ranking(members, certifications);
@@ -21,14 +23,16 @@ export default function RankingPage() {
   return (
     <main className="px-5 pt-6 pb-24 max-w-5xl mx-auto">
       <header className="flex items-center justify-between mb-5">
-        <div>
-          <p className="text-xs text-neutral-500">안녕하세요</p>
-          <h1 className="text-xl font-bold text-neutral-900">{myName} 님</h1>
+        <div className="min-w-0">
+          <p className="text-xs text-neutral-500 truncate">
+            {teamName ?? '팀'} · <span className="font-mono">{teamCode}</span>
+          </p>
+          <h1 className="text-xl font-bold text-neutral-900 truncate">{myName} 님</h1>
         </div>
         <button
           type="button"
           onClick={logout}
-          className="h-10 px-3 rounded-lg text-sm text-neutral-500 border border-neutral-200 active:scale-95"
+          className="h-10 px-3 rounded-lg text-sm text-neutral-500 border border-neutral-200 active:scale-95 shrink-0"
         >
           로그아웃
         </button>

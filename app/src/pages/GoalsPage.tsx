@@ -65,10 +65,9 @@ function GoalTypeSelect({
   );
 }
 
-function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
-  const updateMember = useTeamStore((s) => s.updateMember);
-  const removeMember = useTeamStore((s) => s.removeMember);
-  const logout = useTeamStore((s) => s.logout);
+function MyMemberRow({ member }: { member: Member }) {
+  const updateMyProfile = useTeamStore((s) => s.updateMyProfile);
+  const removeMyself = useTeamStore((s) => s.removeMyself);
   const certsCount = useTeamStore(
     (s) => s.certifications.filter((c) => c.memberId === member.id).length
   );
@@ -85,7 +84,7 @@ function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const onSave = () => {
+  const onSave = async () => {
     const err = validate(draft);
     if (err) {
       setError(err);
@@ -93,9 +92,8 @@ function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
     }
     setError(null);
     const currentNum = Number(draft.goalCurrent);
-    const startNum =
-      draft.goalStart.trim() === '' ? currentNum : Number(draft.goalStart);
-    updateMember(member.id, {
+    const startNum = draft.goalStart.trim() === '' ? currentNum : Number(draft.goalStart);
+    await updateMyProfile({
       name: draft.name.trim(),
       goalType: draft.goalType,
       goalStart: startNum,
@@ -117,36 +115,34 @@ function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
             </span>
           </div>
           <p className="text-xs text-neutral-500 mt-0.5">
-            시작 {member.goalStart ?? member.goalCurrent} → 현재 {member.goalCurrent} / 목표 {member.goalTarget} {member.goalUnit} · 목표 {goalScore(member)}점 · 인증 {certsCount * 10}점
+            시작 {member.goalStart ?? member.goalCurrent} → 현재 {member.goalCurrent} / 목표{' '}
+            {member.goalTarget} {member.goalUnit} · 목표 {goalScore(member)}점 · 인증{' '}
+            {certsCount * 10}점
           </p>
         </div>
-        {canEdit ? (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                setEditing((v) => !v);
-                setError(null);
-              }}
-              className="h-10 px-3 rounded-lg text-sm text-accent border border-accent/30 active:scale-95"
-            >
-              {editing ? '접기' : '수정'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="h-10 px-3 rounded-lg text-sm text-red-600 border border-red-200 active:scale-95"
-              title="내 계정 삭제"
-            >
-              탈퇴
-            </button>
-          </div>
-        ) : (
-          <span className="text-[10px] text-neutral-400 whitespace-nowrap">팀원</span>
-        )}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setEditing((v) => !v);
+              setError(null);
+            }}
+            className="h-10 px-3 rounded-lg text-sm text-accent border border-accent/30 active:scale-95"
+          >
+            {editing ? '접기' : '수정'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="h-10 px-3 rounded-lg text-sm text-red-600 border border-red-200 active:scale-95"
+            title="내 계정 삭제"
+          >
+            탈퇴
+          </button>
+        </div>
       </div>
 
-      {editing && canEdit && (
+      {editing && (
         <div className="mt-4 space-y-2">
           <label className="block">
             <span className="text-xs text-neutral-500">이름</span>
@@ -179,7 +175,7 @@ function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
                 inputMode="decimal"
                 value={draft.goalStart}
                 onChange={(e) => setDraft({ ...draft, goalStart: e.target.value })}
-                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1"
               />
             </label>
             <label className="block col-span-1">
@@ -189,7 +185,7 @@ function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
                 inputMode="decimal"
                 value={draft.goalCurrent}
                 onChange={(e) => setDraft({ ...draft, goalCurrent: e.target.value })}
-                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1"
               />
             </label>
             <label className="block col-span-1">
@@ -199,7 +195,7 @@ function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
                 inputMode="decimal"
                 value={draft.goalTarget}
                 onChange={(e) => setDraft({ ...draft, goalTarget: e.target.value })}
-                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1"
               />
             </label>
             <label className="block col-span-1">
@@ -208,7 +204,7 @@ function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
                 value={draft.goalUnit}
                 onChange={(e) => setDraft({ ...draft, goalUnit: e.target.value })}
                 placeholder="kg"
-                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1"
               />
             </label>
           </div>
@@ -233,12 +229,37 @@ function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
         message={`정말 탈퇴하시겠습니까?\n'${member.name}' 님의 모든 인증 기록도 삭제됩니다.`}
         confirmLabel="탈퇴"
         onCancel={() => setConfirmDelete(false)}
-        onConfirm={() => {
-          removeMember(member.id);
-          logout();
+        onConfirm={async () => {
+          await removeMyself();
           setConfirmDelete(false);
         }}
       />
+    </article>
+  );
+}
+
+function OtherMemberRow({ member }: { member: Member }) {
+  const certsCount = useTeamStore(
+    (s) => s.certifications.filter((c) => c.memberId === member.id).length
+  );
+  return (
+    <article className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-neutral-900 truncate">{member.name}</p>
+            <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
+              {GOAL_TYPE_LABEL[member.goalType ?? 'weight']}
+            </span>
+          </div>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            시작 {member.goalStart ?? member.goalCurrent} → 현재 {member.goalCurrent} / 목표{' '}
+            {member.goalTarget} {member.goalUnit} · 목표 {goalScore(member)}점 · 인증{' '}
+            {certsCount * 10}점
+          </p>
+        </div>
+        <span className="text-[10px] text-neutral-400 whitespace-nowrap">팀원</span>
+      </div>
     </article>
   );
 }
@@ -253,7 +274,9 @@ export default function GoalsPage() {
     <main className="px-5 pt-6 pb-24 max-w-xl mx-auto">
       <header className="mb-5">
         <h1 className="text-xl font-bold text-neutral-900">목표 설정</h1>
-        <p className="text-sm text-neutral-500 mt-0.5">팀원 {members.length}명 · 내 목표만 수정 가능</p>
+        <p className="text-sm text-neutral-500 mt-0.5">
+          팀원 {members.length}명 · 내 목표만 수정 가능
+        </p>
       </header>
 
       <TeamChallengeSection />
@@ -261,7 +284,7 @@ export default function GoalsPage() {
       {me && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-neutral-500 mb-2">내 목표</h2>
-          <MemberRow member={me} canEdit />
+          <MyMemberRow member={me} />
         </section>
       )}
 
@@ -271,18 +294,11 @@ export default function GoalsPage() {
           <ul className="space-y-3">
             {others.map((m) => (
               <li key={m.id}>
-                <MemberRow member={m} canEdit={false} />
+                <OtherMemberRow member={m} />
               </li>
             ))}
           </ul>
         </section>
-      )}
-
-      {members.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-neutral-300 p-10 text-center mt-4">
-          <p className="text-neutral-600">아직 팀원이 없어요</p>
-          <p className="text-sm text-neutral-400 mt-1">팀원이 각자 회원가입으로 합류할 수 있어요</p>
-        </div>
       )}
     </main>
   );

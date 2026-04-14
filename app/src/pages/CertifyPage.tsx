@@ -52,12 +52,11 @@ export default function CertifyPage() {
     }
   };
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     if (!preview || !myMember) return;
     setBusy(true);
     try {
-      addCertification({
-        memberId: myMember.id,
+      await addCertification({
         imageDataUrl: preview,
         caption: caption.trim() || undefined,
       });

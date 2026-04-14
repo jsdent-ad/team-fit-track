@@ -6,15 +6,20 @@ import BottomTabs from './components/BottomTabs';
 import CelebrationModal from './components/CelebrationModal';
 import OnboardingTour from './components/OnboardingTour';
 import LoginPage from './pages/LoginPage';
+import TeamOnboardingPage from './pages/TeamOnboardingPage';
 import RankingPage from './pages/RankingPage';
 import CertifyPage from './pages/CertifyPage';
 import RecordsPage from './pages/RecordsPage';
 import GoalsPage from './pages/GoalsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+function RequireTeamAndMember({ children }: { children: React.ReactNode }) {
+  const currentTeamId = useTeamStore((s) => s.currentTeamId);
   const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const location = useLocation();
+  if (!currentTeamId) {
+    return <Navigate to="/team" replace state={{ from: location.pathname }} />;
+  }
   if (!currentMemberId) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
@@ -23,76 +28,82 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function CelebrationWatcher() {
   const members = useTeamStore((s) => s.members);
-  const celebratedMemberIds = useTeamStore((s) => s.celebratedMemberIds);
   const markCelebrated = useTeamStore((s) => s.markCelebrated);
   const [celebrating, setCelebrating] = useState<Member | null>(null);
 
   useEffect(() => {
     if (celebrating) return;
-    const achiever = members.find(
-      (m) => goalScore(m) === 100 && !celebratedMemberIds.includes(m.id)
-    );
+    const achiever = members.find((m) => goalScore(m) === 100 && !m.celebrated);
     if (achiever) {
       setCelebrating(achiever);
       markCelebrated(achiever.id);
     }
-  }, [members, celebratedMemberIds, celebrating, markCelebrated]);
+  }, [members, celebrating, markCelebrated]);
 
-  return (
-    <CelebrationModal
-      member={celebrating}
-      onClose={() => setCelebrating(null)}
-    />
-  );
+  return <CelebrationModal member={celebrating} onClose={() => setCelebrating(null)} />;
 }
 
 function TourGate() {
-  const currentMemberId = useTeamStore((s) => s.currentMemberId);
-  const tourCompletedMemberIds = useTeamStore((s) => s.tourCompletedMemberIds);
+  const getCurrent = useTeamStore((s) => s.getCurrentMember);
   const markTourCompleted = useTeamStore((s) => s.markTourCompleted);
-  if (!currentMemberId || tourCompletedMemberIds.includes(currentMemberId)) return null;
-  return <OnboardingTour onDone={() => markTourCompleted(currentMemberId)} />;
+  const me = getCurrent();
+  if (!me || me.tourCompleted) return null;
+  return <OnboardingTour onDone={() => markTourCompleted()} />;
 }
 
 export default function App() {
+  const currentTeamId = useTeamStore((s) => s.currentTeamId);
   const currentMemberId = useTeamStore((s) => s.currentMemberId);
+
   return (
     <div className="min-h-full bg-white text-neutral-900">
       <Routes>
         <Route
+          path="/team"
+          element={currentTeamId ? <Navigate to="/login" replace /> : <TeamOnboardingPage />}
+        />
+        <Route
           path="/login"
-          element={currentMemberId ? <Navigate to="/" replace /> : <LoginPage />}
+          element={
+            !currentTeamId ? (
+              <Navigate to="/team" replace />
+            ) : currentMemberId ? (
+              <Navigate to="/" replace />
+            ) : (
+              <LoginPage />
+            )
+          }
         />
         <Route
           path="/"
           element={
-            <RequireAuth>
+            <RequireTeamAndMember>
               <RankingPage />
-            </RequireAuth>
+            </RequireTeamAndMember>
           }
         />
         <Route
           path="/certify"
           element={
-            <RequireAuth>
+            <RequireTeamAndMember>
               <CertifyPage />
-            </RequireAuth>
+            </RequireTeamAndMember>
           }
         />
         <Route
           path="/records"
           element={
-            <RequireAuth>
+            <RequireTeamAndMember>
               <RecordsPage />
-            </RequireAuth>
+            </RequireTeamAndMember>
           }
         />
         <Route
           path="/goals"
           element={
-            <RequireAuth>
+            <RequireTeamAndMember>
               <GoalsPage />
-            </RequireAuth>
+            </RequireTeamAndMember>
           }
         />
         <Route path="*" element={<NotFoundPage />} />

@@ -39,3 +39,8 @@ eval-round*-results.json
 
 # Claude Code local memory (agent runtime state)
 .claude/
+
+# Env files
+app/.env
+app/.env.local
+app/.env.*.local

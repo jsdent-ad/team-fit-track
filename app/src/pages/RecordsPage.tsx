@@ -7,8 +7,8 @@ export default function RecordsPage() {
   const members = useTeamStore((s) => s.members);
   const certifications = useTeamStore((s) => s.certifications);
   const currentMemberId = useTeamStore((s) => s.currentMemberId);
-  const updateCertification = useTeamStore((s) => s.updateCertification);
-  const removeCertification = useTeamStore((s) => s.removeCertification);
+  const updateMyCertification = useTeamStore((s) => s.updateMyCertification);
+  const removeMyCertification = useTeamStore((s) => s.removeMyCertification);
 
   const memberName = useMemo(() => {
     const m = new Map<string, string>();
@@ -43,7 +43,7 @@ export default function RecordsPage() {
                 cert={c}
                 memberName={memberName.get(c.memberId) ?? '알 수 없음'}
                 canEdit={c.memberId === currentMemberId}
-                onUpdateCaption={(id, caption) => updateCertification(id, { caption: caption || undefined })}
+                onUpdateCaption={(id, caption) => updateMyCertification(id, { caption: caption || null })}
                 onRequestDelete={(id) => setPendingDeleteId(id)}
               />
             </li>
@@ -60,7 +60,7 @@ export default function RecordsPage() {
         destructive
         onCancel={() => setPendingDeleteId(null)}
         onConfirm={() => {
-          if (pendingDeleteId) removeCertification(pendingDeleteId);
+          if (pendingDeleteId) removeMyCertification(pendingDeleteId);
           setPendingDeleteId(null);
         }}
       />

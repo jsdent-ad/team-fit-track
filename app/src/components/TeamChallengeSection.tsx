@@ -2,11 +2,6 @@ import { useMemo, useState } from 'react';
 import { useTeamStore, type TeamChallenge } from '../store/useTeamStore';
 import ConfirmDialog from './ConfirmDialog';
 
-function uuid() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return 'ch-' + Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
-}
-
 function formatMD(d: string): string {
   if (!d) return '';
   const parts = d.split('-');
@@ -45,6 +40,7 @@ export function computeChallengeProgress(
 export default function TeamChallengeSection() {
   const challenge = useTeamStore((s) => s.teamChallenge);
   const setChallenge = useTeamStore((s) => s.setTeamChallenge);
+  const deleteChallenge = useTeamStore((s) => s.deleteTeamChallenge);
   const certifications = useTeamStore((s) => s.certifications);
 
   const [editing, setEditing] = useState(false);
@@ -73,7 +69,7 @@ export default function TeamChallengeSection() {
     setError(null);
   };
 
-  const onCreate = () => {
+  const onCreate = async () => {
     if (!title.trim()) {
       setError('제목을 입력해주세요');
       return;
@@ -91,15 +87,13 @@ export default function TeamChallengeSection() {
       setError('종료일은 시작일 이후여야 합니다');
       return;
     }
-    const c: TeamChallenge = {
-      id: uuid(),
+    await setChallenge({
       title: title.trim(),
       themeEmoji: themeEmoji.trim() || '🔥',
       targetCount: target,
       startDate,
       endDate,
-    };
-    setChallenge(c);
+    });
     setEditing(false);
     resetForm();
   };
@@ -243,8 +237,8 @@ export default function TeamChallengeSection() {
         message="정말 삭제하시겠습니까?"
         confirmLabel="삭제"
         onCancel={() => setConfirmDelete(false)}
-        onConfirm={() => {
-          setChallenge(null);
+        onConfirm={async () => {
+          await deleteChallenge();
           setConfirmDelete(false);
         }}
       />
