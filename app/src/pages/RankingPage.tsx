@@ -8,24 +8,22 @@ import ChallengeBadge from '../components/ChallengeBadge';
 export default function RankingPage() {
   const members = useTeamStore((s) => s.members);
   const certifications = useTeamStore((s) => s.certifications);
-  const currentUser = useTeamStore((s) => s.currentUser);
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const logout = useTeamStore((s) => s.logout);
 
   const rows = ranking(members, certifications);
-  const myRow = rows.find(
-    (r) => r.member.name.trim().toLowerCase() === (currentUser ?? '').trim().toLowerCase()
-  );
+  const myRow = rows.find((r) => r.member.id === currentMemberId);
+  const myName = myRow?.member.name ?? '';
 
   const top3 = rows.slice(0, 3);
-  const isMe = (name: string) =>
-    !!currentUser && name.trim().toLowerCase() === currentUser.trim().toLowerCase();
+  const isMe = (memberId: string) => memberId === currentMemberId;
 
   return (
     <main className="px-5 pt-6 pb-24 max-w-5xl mx-auto">
       <header className="flex items-center justify-between mb-5">
         <div>
           <p className="text-xs text-neutral-500">안녕하세요</p>
-          <h1 className="text-xl font-bold text-neutral-900">{currentUser} 님</h1>
+          <h1 className="text-xl font-bold text-neutral-900">{myName} 님</h1>
         </div>
         <button
           type="button"
@@ -94,7 +92,7 @@ export default function RankingPage() {
                   <MemberCard
                     row={row}
                     rank={idx + 1}
-                    highlight={isMe(row.member.name)}
+                    highlight={isMe(row.member.id)}
                   />
                 </li>
               ))}
@@ -111,7 +109,7 @@ export default function RankingPage() {
           </h2>
           <ul className="space-y-2">
             {rows.map((row, idx) => {
-              const highlight = isMe(row.member.name);
+              const highlight = isMe(row.member.id);
               const typeLabel = GOAL_TYPE_LABEL[row.member.goalType ?? 'weight'];
               return (
                 <li key={row.member.id}>

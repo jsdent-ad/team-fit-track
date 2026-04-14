@@ -12,9 +12,9 @@ import GoalsPage from './pages/GoalsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const currentUser = useTeamStore((s) => s.currentUser);
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const location = useLocation();
-  if (!currentUser) {
+  if (!currentMemberId) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
   return <>{children}</>;
@@ -46,13 +46,13 @@ function CelebrationWatcher() {
 }
 
 export default function App() {
-  const currentUser = useTeamStore((s) => s.currentUser);
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
   return (
     <div className="min-h-full bg-white text-neutral-900">
       <Routes>
         <Route
           path="/login"
-          element={currentUser ? <Navigate to="/" replace /> : <LoginPage />}
+          element={currentMemberId ? <Navigate to="/" replace /> : <LoginPage />}
         />
         <Route
           path="/"
@@ -88,8 +88,8 @@ export default function App() {
         />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-      {currentUser && <BottomTabs />}
-      {currentUser && <CelebrationWatcher />}
+      {currentMemberId && <BottomTabs />}
+      {currentMemberId && <CelebrationWatcher />}
     </div>
   );
 }

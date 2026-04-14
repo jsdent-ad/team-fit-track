@@ -3,10 +3,9 @@ import { useTeamStore } from '../store/useTeamStore';
 import { convertToWebP } from '../store/image';
 
 export default function CertifyPage() {
-  const currentUser = useTeamStore((s) => s.currentUser);
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const members = useTeamStore((s) => s.members);
   const certifications = useTeamStore((s) => s.certifications);
-  const ensureMemberForUser = useTeamStore((s) => s.ensureMemberForUser);
   const addCertification = useTeamStore((s) => s.addCertification);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -17,11 +16,10 @@ export default function CertifyPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const myMember = useMemo(() => {
-    if (!currentUser) return undefined;
-    const key = currentUser.trim().toLowerCase();
-    return members.find((m) => m.name.trim().toLowerCase() === key);
-  }, [currentUser, members]);
+  const myMember = useMemo(
+    () => members.find((m) => m.id === currentMemberId),
+    [currentMemberId, members]
+  );
 
   const todaysCerts = useMemo(() => {
     if (!myMember) return [];
@@ -55,12 +53,11 @@ export default function CertifyPage() {
   };
 
   const onSubmit = () => {
-    if (!preview || !currentUser) return;
+    if (!preview || !myMember) return;
     setBusy(true);
     try {
-      const member = ensureMemberForUser(currentUser);
       addCertification({
-        memberId: member.id,
+        memberId: myMember.id,
         imageDataUrl: preview,
         caption: caption.trim() || undefined,
       });

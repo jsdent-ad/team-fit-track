@@ -4,6 +4,7 @@ import type { Certification } from '../store/useTeamStore';
 type Props = {
   cert: Certification;
   memberName: string;
+  canEdit: boolean;
   onUpdateCaption: (id: string, caption: string) => void;
   onRequestDelete: (id: string) => void;
 };
@@ -22,7 +23,7 @@ function formatTime(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${time}`;
 }
 
-export default function CertificationCard({ cert, memberName, onUpdateCaption, onRequestDelete }: Props) {
+export default function CertificationCard({ cert, memberName, canEdit, onUpdateCaption, onRequestDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(cert.caption ?? '');
 
@@ -40,42 +41,46 @@ export default function CertificationCard({ cert, memberName, onUpdateCaption, o
             <div className="font-semibold text-neutral-900 truncate">{memberName}</div>
             <div className="text-xs text-neutral-500">{formatTime(cert.createdAt)}</div>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              aria-label="캡션 수정"
-              onClick={() => setEditing((v) => !v)}
-              className="w-10 h-10 rounded-lg hover:bg-neutral-100 active:scale-95 flex items-center justify-center text-neutral-600"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M4 20h4l10-10-4-4L4 16v4z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              aria-label="인증 삭제"
-              onClick={() => onRequestDelete(cert.id)}
-              className="w-10 h-10 rounded-lg hover:bg-red-50 active:scale-95 flex items-center justify-center text-red-600"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M5 7h14M10 7V5a1 1 0 011-1h2a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </div>
+          {canEdit ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="캡션 수정"
+                onClick={() => setEditing((v) => !v)}
+                className="w-10 h-10 rounded-lg hover:bg-neutral-100 active:scale-95 flex items-center justify-center text-neutral-600"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M4 20h4l10-10-4-4L4 16v4z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="인증 삭제"
+                onClick={() => onRequestDelete(cert.id)}
+                className="w-10 h-10 rounded-lg hover:bg-red-50 active:scale-95 flex items-center justify-center text-red-600"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M5 7h14M10 7V5a1 1 0 011-1h2a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <span className="text-[10px] text-neutral-400">팀원 기록</span>
+          )}
         </div>
 
-        {editing ? (
+        {editing && canEdit ? (
           <div className="mt-3 space-y-2">
             <textarea
               value={draft}

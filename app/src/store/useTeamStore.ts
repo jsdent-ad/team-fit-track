@@ -18,11 +18,14 @@ export const GOAL_TYPE_DEFAULT_UNIT: Record<GoalType, string> = {
 export type Member = {
   id: string;
   name: string;
+  // auth — null means legacy member without credentials, new signup can claim it
+  passwordHash: string | null;
   goalType: GoalType;
   goalStart: number;
   goalTarget: number;
   goalCurrent: number;
   goalUnit: string;
+  createdAt: string;
 };
 
 export type Certification = {
@@ -38,26 +41,48 @@ export type TeamChallenge = {
   title: string;
   targetCount: number;
   themeEmoji: string;
-  startDate: string; // ISO date yyyy-mm-dd
-  endDate: string;   // ISO date yyyy-mm-dd
+  startDate: string;
+  endDate: string;
 };
 
+export type AuthResult =
+  | { ok: true; member: Member }
+  | { ok: false; reason: 'name-empty' | 'password-empty' | 'not-found' | 'wrong-password' | 'already-exists' | 'name-conflict' | 'password-mismatch' };
+
 export interface TeamState {
-  currentUser: string | null;
+  currentMemberId: string | null;
   members: Member[];
   certifications: Certification[];
   celebratedMemberIds: string[];
   teamChallenge: TeamChallenge | null;
-  login: (name: string) => void;
+
+  // Auth
+  signup: (input: {
+    name: string;
+    password: string;
+    goalType?: GoalType;
+    goalStart?: number;
+    goalTarget?: number;
+    goalCurrent?: number;
+    goalUnit?: string;
+  }) => Promise<AuthResult>;
+  login: (name: string, password: string) => Promise<AuthResult>;
+  claimLegacy: (name: string, password: string) => Promise<AuthResult>;
   logout: () => void;
-  addMember: (m: Omit<Member, 'id'>) => Member;
-  updateMember: (id: string, patch: Partial<Omit<Member, 'id'>>) => void;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<AuthResult>;
+
+  // Members (only current user can mutate their own, enforced in UI)
+  updateMember: (id: string, patch: Partial<Omit<Member, 'id' | 'passwordHash' | 'createdAt'>>) => void;
   removeMember: (id: string) => void;
+
+  // Certifications
   addCertification: (c: Omit<Certification, 'id' | 'createdAt'>) => Certification;
   updateCertification: (id: string, patch: Partial<Omit<Certification, 'id' | 'createdAt' | 'memberId'>>) => void;
   removeCertification: (id: string) => void;
+
+  // Helpers
+  getCurrentMember: () => Member | undefined;
   getMemberByName: (name: string) => Member | undefined;
-  ensureMemberForUser: (name: string) => Member;
   markCelebrated: (memberId: string) => void;
   setTeamChallenge: (c: TeamChallenge | null) => void;
 }
@@ -80,32 +105,120 @@ function uuid(): string {
   return 'id-' + Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
 }
 
+// Browser-only SHA-256 via SubtleCrypto. Not real security (still localStorage),
+// but prevents trivial plaintext exposure when inspecting storage.
+async function hashPassword(raw: string): Promise<string> {
+  const data = new TextEncoder().encode(raw);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function normalizeName(n: string): string {
+  return n.trim().toLowerCase();
+}
+
 export const useTeamStore = create<TeamState>()(
   persist(
     (set, get) => ({
-      currentUser: null,
+      currentMemberId: null,
       members: [],
       certifications: [],
       celebratedMemberIds: [],
       teamChallenge: null,
 
-      login: (name) => set({ currentUser: name.trim() }),
-      logout: () => set({ currentUser: null }),
-
-      addMember: (m) => {
-        const goalCurrent = Number.isFinite(m.goalCurrent) ? m.goalCurrent : 0;
-        const goalStart = Number.isFinite(m.goalStart) ? m.goalStart : goalCurrent;
+      signup: async ({ name, password, goalType, goalStart, goalTarget, goalCurrent, goalUnit }) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) return { ok: false, reason: 'name-empty' };
+        if (!password) return { ok: false, reason: 'password-empty' };
+        const existing = get().members.find((m) => normalizeName(m.name) === normalizeName(trimmedName));
+        if (existing && existing.passwordHash) {
+          return { ok: false, reason: 'already-exists' };
+        }
+        const hash = await hashPassword(password);
+        if (existing && !existing.passwordHash) {
+          // Legacy member takeover via signup path
+          const updated: Member = { ...existing, passwordHash: hash };
+          set((s) => ({
+            members: s.members.map((m) => (m.id === existing.id ? updated : m)),
+            currentMemberId: existing.id,
+          }));
+          return { ok: true, member: updated };
+        }
+        const current = Number.isFinite(goalCurrent ?? NaN) ? (goalCurrent as number) : 0;
+        const start = Number.isFinite(goalStart ?? NaN) ? (goalStart as number) : current;
         const newMember: Member = {
           id: uuid(),
-          name: m.name.trim(),
-          goalType: m.goalType ?? 'weight',
-          goalStart,
-          goalTarget: Number.isFinite(m.goalTarget) ? m.goalTarget : 0,
-          goalCurrent,
-          goalUnit: m.goalUnit || '',
+          name: trimmedName,
+          passwordHash: hash,
+          goalType: goalType ?? 'weight',
+          goalStart: start,
+          goalTarget: Number.isFinite(goalTarget ?? NaN) ? (goalTarget as number) : 0,
+          goalCurrent: current,
+          goalUnit: (goalUnit && goalUnit.trim()) || GOAL_TYPE_DEFAULT_UNIT[goalType ?? 'weight'],
+          createdAt: new Date().toISOString(),
         };
-        set((s) => ({ members: [...s.members, newMember] }));
-        return newMember;
+        set((s) => ({
+          members: [...s.members, newMember],
+          currentMemberId: newMember.id,
+        }));
+        return { ok: true, member: newMember };
+      },
+
+      login: async (name, password) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) return { ok: false, reason: 'name-empty' };
+        if (!password) return { ok: false, reason: 'password-empty' };
+        const member = get().members.find(
+          (m) => normalizeName(m.name) === normalizeName(trimmedName)
+        );
+        if (!member) return { ok: false, reason: 'not-found' };
+        if (!member.passwordHash) {
+          // Legacy member — must go through claimLegacy path
+          return { ok: false, reason: 'not-found' };
+        }
+        const hash = await hashPassword(password);
+        if (hash !== member.passwordHash) {
+          return { ok: false, reason: 'wrong-password' };
+        }
+        set({ currentMemberId: member.id });
+        return { ok: true, member };
+      },
+
+      claimLegacy: async (name, password) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) return { ok: false, reason: 'name-empty' };
+        if (!password) return { ok: false, reason: 'password-empty' };
+        const member = get().members.find(
+          (m) => normalizeName(m.name) === normalizeName(trimmedName)
+        );
+        if (!member) return { ok: false, reason: 'not-found' };
+        if (member.passwordHash) return { ok: false, reason: 'already-exists' };
+        const hash = await hashPassword(password);
+        const updated: Member = { ...member, passwordHash: hash };
+        set((s) => ({
+          members: s.members.map((m) => (m.id === member.id ? updated : m)),
+          currentMemberId: updated.id,
+        }));
+        return { ok: true, member: updated };
+      },
+
+      logout: () => set({ currentMemberId: null }),
+
+      changePassword: async (oldPassword, newPassword) => {
+        const id = get().currentMemberId;
+        if (!id) return { ok: false, reason: 'not-found' };
+        const member = get().members.find((m) => m.id === id);
+        if (!member || !member.passwordHash) return { ok: false, reason: 'not-found' };
+        if (!newPassword) return { ok: false, reason: 'password-empty' };
+        const oldHash = await hashPassword(oldPassword);
+        if (oldHash !== member.passwordHash) return { ok: false, reason: 'wrong-password' };
+        const hash = await hashPassword(newPassword);
+        set((s) => ({
+          members: s.members.map((m) => (m.id === id ? { ...m, passwordHash: hash } : m)),
+        }));
+        return { ok: true, member: { ...member, passwordHash: hash } };
       },
 
       updateMember: (id, patch) =>
@@ -124,6 +237,7 @@ export const useTeamStore = create<TeamState>()(
           members: s.members.filter((m) => m.id !== id),
           certifications: s.certifications.filter((c) => c.memberId !== id),
           celebratedMemberIds: s.celebratedMemberIds.filter((cid) => cid !== id),
+          currentMemberId: s.currentMemberId === id ? null : s.currentMemberId,
         })),
 
       addCertification: (c) => {
@@ -140,9 +254,7 @@ export const useTeamStore = create<TeamState>()(
 
       updateCertification: (id, patch) =>
         set((s) => ({
-          certifications: s.certifications.map((c) =>
-            c.id === id ? { ...c, ...patch } : c
-          ),
+          certifications: s.certifications.map((c) => (c.id === id ? { ...c, ...patch } : c)),
         })),
 
       removeCertification: (id) =>
@@ -150,22 +262,14 @@ export const useTeamStore = create<TeamState>()(
           certifications: s.certifications.filter((c) => c.id !== id),
         })),
 
-      getMemberByName: (name) => {
-        const trimmed = name.trim().toLowerCase();
-        return get().members.find((m) => m.name.trim().toLowerCase() === trimmed);
+      getCurrentMember: () => {
+        const id = get().currentMemberId;
+        return id ? get().members.find((m) => m.id === id) : undefined;
       },
 
-      ensureMemberForUser: (name) => {
-        const existing = get().getMemberByName(name);
-        if (existing) return existing;
-        return get().addMember({
-          name,
-          goalType: 'weight',
-          goalStart: 0,
-          goalTarget: 0,
-          goalCurrent: 0,
-          goalUnit: 'kg',
-        });
+      getMemberByName: (name) => {
+        const trimmed = normalizeName(name);
+        return get().members.find((m) => normalizeName(m.name) === trimmed);
       },
 
       markCelebrated: (memberId) =>
@@ -179,10 +283,10 @@ export const useTeamStore = create<TeamState>()(
     }),
     {
       name: 'teamfit-v1',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        currentUser: state.currentUser,
+        currentMemberId: state.currentMemberId,
         members: state.members,
         certifications: state.certifications,
         celebratedMemberIds: state.celebratedMemberIds,
@@ -207,8 +311,26 @@ export const useTeamStore = create<TeamState>()(
               return { ...m, goalStart: typeof m.goalStart === 'number' ? m.goalStart : current };
             });
           }
-          // Reset celebration state — previous entries were based on the buggy formula.
           state.celebratedMemberIds = [];
+        }
+        if (version < 4) {
+          // v3 used currentUser (name string); v4 uses currentMemberId
+          if (Array.isArray(state.members)) {
+            state.members = (state.members as Array<Record<string, unknown>>).map((m) => ({
+              passwordHash: null,
+              createdAt: typeof m.createdAt === 'string' ? m.createdAt : new Date().toISOString(),
+              ...m,
+            }));
+            // Map legacy currentUser (name) to matching member id if possible
+            const currentUserName = typeof state.currentUser === 'string' ? state.currentUser.trim().toLowerCase() : '';
+            const match = (state.members as Array<{ id: string; name: string }>).find(
+              (m) => m.name.trim().toLowerCase() === currentUserName
+            );
+            state.currentMemberId = match ? match.id : null;
+          } else {
+            state.currentMemberId = null;
+          }
+          delete state.currentUser;
         }
         return state as unknown as TeamState;
       },
@@ -223,11 +345,9 @@ export const useTeamStore = create<TeamState>()(
           return;
         }
         if (!state) return;
-        // Sanity guards
         if (!Array.isArray(state.members)) state.members = [];
         if (!Array.isArray(state.certifications)) state.certifications = [];
         if (!Array.isArray(state.celebratedMemberIds)) state.celebratedMemberIds = [];
-        // Ensure goalType + goalStart on each member (defensive, in case migrate was skipped)
         state.members = state.members.map((m) => {
           const mm = m as Member;
           return {
@@ -237,8 +357,14 @@ export const useTeamStore = create<TeamState>()(
               typeof mm.goalStart === 'number' && Number.isFinite(mm.goalStart)
                 ? mm.goalStart
                 : mm.goalCurrent,
+            passwordHash: typeof mm.passwordHash === 'string' ? mm.passwordHash : null,
+            createdAt: typeof mm.createdAt === 'string' ? mm.createdAt : new Date().toISOString(),
           };
         });
+        // Ensure current id still exists
+        if (state.currentMemberId && !state.members.some((m) => m.id === state.currentMemberId)) {
+          state.currentMemberId = null;
+        }
         if (typeof state.teamChallenge === 'undefined') state.teamChallenge = null;
       },
     }

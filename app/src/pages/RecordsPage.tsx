@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 export default function RecordsPage() {
   const members = useTeamStore((s) => s.members);
   const certifications = useTeamStore((s) => s.certifications);
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const updateCertification = useTeamStore((s) => s.updateCertification);
   const removeCertification = useTeamStore((s) => s.removeCertification);
 
@@ -41,6 +42,7 @@ export default function RecordsPage() {
               <CertificationCard
                 cert={c}
                 memberName={memberName.get(c.memberId) ?? '알 수 없음'}
+                canEdit={c.memberId === currentMemberId}
                 onUpdateCaption={(id, caption) => updateCertification(id, { caption: caption || undefined })}
                 onRequestDelete={(id) => setPendingDeleteId(id)}
               />

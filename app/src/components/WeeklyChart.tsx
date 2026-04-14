@@ -26,14 +26,9 @@ type Row = {
 
 export default function WeeklyChart() {
   const certifications = useTeamStore((s) => s.certifications);
-  const currentUser = useTeamStore((s) => s.currentUser);
-  const members = useTeamStore((s) => s.members);
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
 
-  const myMemberId = useMemo(() => {
-    if (!currentUser) return null;
-    const key = currentUser.trim().toLowerCase();
-    return members.find((m) => m.name.trim().toLowerCase() === key)?.id ?? null;
-  }, [currentUser, members]);
+  const myMemberId = currentMemberId;
 
   const data: Row[] = useMemo(() => {
     const today = startOfDay(new Date());

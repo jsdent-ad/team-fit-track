@@ -19,15 +19,6 @@ type Draft = {
   goalUnit: string;
 };
 
-const emptyDraft: Draft = {
-  name: '',
-  goalType: 'weight',
-  goalStart: '',
-  goalTarget: '',
-  goalCurrent: '',
-  goalUnit: 'kg',
-};
-
 function validate(draft: Draft): string | null {
   if (!draft.name.trim()) return '이름을 입력해주세요';
   const target = Number(draft.goalTarget);
@@ -74,9 +65,10 @@ function GoalTypeSelect({
   );
 }
 
-function MemberRow({ member }: { member: Member }) {
+function MemberRow({ member, canEdit }: { member: Member; canEdit: boolean }) {
   const updateMember = useTeamStore((s) => s.updateMember);
   const removeMember = useTeamStore((s) => s.removeMember);
+  const logout = useTeamStore((s) => s.logout);
   const certsCount = useTeamStore(
     (s) => s.certifications.filter((c) => c.memberId === member.id).length
   );
@@ -109,7 +101,7 @@ function MemberRow({ member }: { member: Member }) {
       goalStart: startNum,
       goalTarget: Number(draft.goalTarget),
       goalCurrent: currentNum,
-      goalUnit: draft.goalUnit.trim(),
+      goalUnit: draft.goalUnit.trim() || GOAL_TYPE_DEFAULT_UNIT[draft.goalType],
     });
     setEditing(false);
   };
@@ -128,28 +120,33 @@ function MemberRow({ member }: { member: Member }) {
             시작 {member.goalStart ?? member.goalCurrent} → 현재 {member.goalCurrent} / 목표 {member.goalTarget} {member.goalUnit} · 목표 {goalScore(member)}점 · 인증 {certsCount * 10}점
           </p>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setEditing((v) => !v);
-              setError(null);
-            }}
-            className="h-10 px-3 rounded-lg text-sm text-accent border border-accent/30 active:scale-95"
-          >
-            {editing ? '접기' : '수정'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="h-10 px-3 rounded-lg text-sm text-red-600 border border-red-200 active:scale-95"
-          >
-            삭제
-          </button>
-        </div>
+        {canEdit ? (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setEditing((v) => !v);
+                setError(null);
+              }}
+              className="h-10 px-3 rounded-lg text-sm text-accent border border-accent/30 active:scale-95"
+            >
+              {editing ? '접기' : '수정'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="h-10 px-3 rounded-lg text-sm text-red-600 border border-red-200 active:scale-95"
+              title="내 계정 삭제"
+            >
+              탈퇴
+            </button>
+          </div>
+        ) : (
+          <span className="text-[10px] text-neutral-400 whitespace-nowrap">팀원</span>
+        )}
       </div>
 
-      {editing && (
+      {editing && canEdit && (
         <div className="mt-4 space-y-2">
           <label className="block">
             <span className="text-xs text-neutral-500">이름</span>
@@ -232,12 +229,13 @@ function MemberRow({ member }: { member: Member }) {
 
       <ConfirmDialog
         open={confirmDelete}
-        title="팀원 삭제"
-        message={`정말 삭제하시겠습니까?\n'${member.name}' 님의 인증 기록도 모두 삭제됩니다.`}
-        confirmLabel="삭제"
+        title="탈퇴"
+        message={`정말 탈퇴하시겠습니까?\n'${member.name}' 님의 모든 인증 기록도 삭제됩니다.`}
+        confirmLabel="탈퇴"
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => {
           removeMember(member.id);
+          logout();
           setConfirmDelete(false);
         }}
       />
@@ -247,157 +245,44 @@ function MemberRow({ member }: { member: Member }) {
 
 export default function GoalsPage() {
   const members = useTeamStore((s) => s.members);
-  const addMember = useTeamStore((s) => s.addMember);
-
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
-  const [adding, setAdding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const onAdd = () => {
-    const err = validate(draft);
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError(null);
-    const currentNum = Number(draft.goalCurrent);
-    const startNum =
-      draft.goalStart.trim() === '' ? currentNum : Number(draft.goalStart);
-    addMember({
-      name: draft.name.trim(),
-      goalType: draft.goalType,
-      goalStart: startNum,
-      goalTarget: Number(draft.goalTarget),
-      goalCurrent: currentNum,
-      goalUnit: draft.goalUnit.trim() || GOAL_TYPE_DEFAULT_UNIT[draft.goalType],
-    });
-    setDraft(emptyDraft);
-    setAdding(false);
-  };
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
+  const me = members.find((m) => m.id === currentMemberId);
+  const others = members.filter((m) => m.id !== currentMemberId);
 
   return (
     <main className="px-5 pt-6 pb-24 max-w-xl mx-auto">
-      <header className="mb-5 flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">목표 설정</h1>
-          <p className="text-sm text-neutral-500 mt-0.5">팀원 {members.length}명</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setAdding((v) => !v);
-            setError(null);
-          }}
-          className="h-10 px-4 rounded-lg bg-accent text-white text-sm font-semibold active:scale-95"
-        >
-          {adding ? '닫기' : '+ 추가'}
-        </button>
+      <header className="mb-5">
+        <h1 className="text-xl font-bold text-neutral-900">목표 설정</h1>
+        <p className="text-sm text-neutral-500 mt-0.5">팀원 {members.length}명 · 내 목표만 수정 가능</p>
       </header>
 
-      {/* Team Challenge */}
       <TeamChallengeSection />
 
-      {adding && (
-        <div className="mb-4 bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
-          <label className="block">
-            <span className="text-xs text-neutral-500">이름</span>
-            <input
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
-              placeholder="홍길동"
-            />
-          </label>
-          <div className="block">
-            <span className="text-xs text-neutral-500">측정 유형</span>
-            <div className="mt-1">
-              <GoalTypeSelect
-                value={draft.goalType}
-                onChange={(v) =>
-                  setDraft((d) => ({
-                    ...d,
-                    goalType: v,
-                    goalUnit: GOAL_TYPE_DEFAULT_UNIT[v],
-                  }))
-                }
-              />
-            </div>
-          </div>
-          <p className="text-[11px] text-neutral-400 leading-relaxed">
-            시작치는 생략하면 현재치가 자동 기준이 돼요. 진행률 = (현재 − 시작) / (목표 − 시작).
-          </p>
-          <div className="grid grid-cols-4 gap-2">
-            <label className="block col-span-1">
-              <span className="text-xs text-neutral-500">시작치</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={draft.goalStart}
-                onChange={(e) => setDraft({ ...draft, goalStart: e.target.value })}
-                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
-                placeholder="선택"
-              />
-            </label>
-            <label className="block col-span-1">
-              <span className="text-xs text-neutral-500">현재치</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={draft.goalCurrent}
-                onChange={(e) => setDraft({ ...draft, goalCurrent: e.target.value })}
-                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
-                placeholder="0"
-              />
-            </label>
-            <label className="block col-span-1">
-              <span className="text-xs text-neutral-500">목표치</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={draft.goalTarget}
-                onChange={(e) => setDraft({ ...draft, goalTarget: e.target.value })}
-                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
-                placeholder="100"
-              />
-            </label>
-            <label className="block col-span-1">
-              <span className="text-xs text-neutral-500">단위</span>
-              <input
-                value={draft.goalUnit}
-                onChange={(e) => setDraft({ ...draft, goalUnit: e.target.value })}
-                placeholder="kg"
-                className="w-full h-11 rounded-lg border border-neutral-200 px-3 mt-1 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
-              />
-            </label>
-          </div>
-          {error && (
-            <p role="alert" className="text-xs text-red-600">
-              {error}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={onAdd}
-            className="w-full h-11 rounded-lg bg-accent text-white font-semibold active:scale-95"
-          >
-            팀원 추가
-          </button>
-        </div>
+      {me && (
+        <section className="mt-4">
+          <h2 className="text-sm font-semibold text-neutral-500 mb-2">내 목표</h2>
+          <MemberRow member={me} canEdit />
+        </section>
       )}
 
-      {members.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-neutral-300 p-10 text-center">
+      {others.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold text-neutral-500 mb-2">팀원 목표</h2>
+          <ul className="space-y-3">
+            {others.map((m) => (
+              <li key={m.id}>
+                <MemberRow member={m} canEdit={false} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {members.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-neutral-300 p-10 text-center mt-4">
           <p className="text-neutral-600">아직 팀원이 없어요</p>
-          <p className="text-sm text-neutral-400 mt-1">+ 추가 버튼으로 팀원을 등록하세요</p>
+          <p className="text-sm text-neutral-400 mt-1">팀원이 각자 회원가입으로 합류할 수 있어요</p>
         </div>
-      ) : (
-        <ul className="space-y-3">
-          {members.map((m) => (
-            <li key={m.id}>
-              <MemberRow member={m} />
-            </li>
-          ))}
-        </ul>
       )}
     </main>
   );
