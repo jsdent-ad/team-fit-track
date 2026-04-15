@@ -24,11 +24,15 @@ create table if not exists public.members (
   goal_unit text not null default 'kg',
   tour_completed boolean not null default false,
   celebrated boolean not null default false,
+  is_leader boolean not null default false,
   created_at timestamptz default now()
 );
 
 create unique index if not exists members_team_name_lower_uniq
   on public.members (team_id, lower(name));
+
+-- For existing deployments: add the column if it's missing.
+alter table public.members add column if not exists is_leader boolean not null default false;
 
 create table if not exists public.certifications (
   id uuid primary key default gen_random_uuid(),

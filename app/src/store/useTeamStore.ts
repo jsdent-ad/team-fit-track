@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { supabase, hashPassword, generateTeamCode, type SupabaseSchema } from '../lib/supabase';
+import { supabase, hashPassword, validateTeamCode, type SupabaseSchema } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type GoalType = 'weight' | 'bodyFat' | 'skeletalMuscle';
@@ -31,6 +31,7 @@ export type Member = {
   goalUnit: string;
   tourCompleted: boolean;
   celebrated: boolean;
+  isLeader: boolean;
   createdAt: string;
 };
 
@@ -57,6 +58,10 @@ export type AuthResult =
   | { ok: true }
   | { ok: false; reason: 'name-empty' | 'password-empty' | 'name-exists' | 'not-found' | 'wrong-password' | 'team-not-found' | 'team-name-empty' | 'network' };
 
+export type CreateTeamResult =
+  | { ok: true; teamId: string; code: string }
+  | { ok: false; reason: 'team-name-empty' | 'code-invalid' | 'code-taken' | 'network'; message?: string };
+
 function rowToMember(r: SupabaseSchema['members']): Member {
   return {
     id: r.id,
@@ -70,6 +75,7 @@ function rowToMember(r: SupabaseSchema['members']): Member {
     goalUnit: r.goal_unit,
     tourCompleted: r.tour_completed,
     celebrated: r.celebrated,
+    isLeader: Boolean(r.is_leader),
     createdAt: r.created_at,
   };
 }
@@ -132,7 +138,7 @@ let realtimeChannel: RealtimeChannel | null = null;
 
 export interface TeamState extends SessionSlice, CacheSlice {
   // Team flow
-  createTeam: (name: string) => Promise<{ ok: true; teamId: string; code: string } | { ok: false; reason: 'team-name-empty' | 'network' }>;
+  createTeam: (name: string, code: string) => Promise<CreateTeamResult>;
   joinTeam: (code: string) => Promise<AuthResult>;
   leaveTeam: () => void;
 
@@ -257,19 +263,26 @@ export const useTeamStore = create<TeamState>()(
         loading: false,
         error: null,
 
-        createTeam: async (name) => {
+        createTeam: async (name, code) => {
           const trimmed = name.trim();
           if (!trimmed) return { ok: false, reason: 'team-name-empty' };
-          const code = generateTeamCode();
+          const validated = validateTeamCode(code);
+          if (!validated.ok) {
+            return { ok: false, reason: 'code-invalid', message: validated.reason };
+          }
           const { data, error } = await supabase
             .from('teams')
-            .insert({ name: trimmed, code })
+            .insert({ name: trimmed, code: validated.normalized })
             .select()
             .single();
-          if (error || !data) {
+          if (error) {
+            if (error.code === '23505') {
+              return { ok: false, reason: 'code-taken' };
+            }
             console.error('[createTeam]', error);
             return { ok: false, reason: 'network' };
           }
+          if (!data) return { ok: false, reason: 'network' };
           set({
             currentTeamId: data.id,
             currentTeamCode: data.code,
@@ -333,10 +346,12 @@ export const useTeamStore = create<TeamState>()(
             .from('members')
             .select('id,name')
             .eq('team_id', teamId);
-          const collide = (existing ?? []).some(
+          const existingList = existing ?? [];
+          const collide = existingList.some(
             (m) => normalizeName(m.name) === normalizeName(trimmed)
           );
           if (collide) return { ok: false, reason: 'name-exists' };
+          const isLeader = existingList.length === 0; // first signup in the team
           const hash = await hashPassword(password);
           const current = Number.isFinite(goalCurrent ?? NaN) ? Number(goalCurrent) : 0;
           const start = Number.isFinite(goalStart ?? NaN) ? Number(goalStart) : current;
@@ -351,6 +366,7 @@ export const useTeamStore = create<TeamState>()(
               goal_target: Number.isFinite(goalTarget ?? NaN) ? Number(goalTarget) : 0,
               goal_current: current,
               goal_unit: (goalUnit && goalUnit.trim()) || GOAL_TYPE_DEFAULT_UNIT[goalType ?? 'weight'],
+              is_leader: isLeader,
             })
             .select()
             .single();

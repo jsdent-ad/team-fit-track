@@ -29,6 +29,11 @@ export default function MemberCard({ row, rank, highlight = false }: Props) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold truncate text-neutral-900">{row.member.name}</span>
+          {row.member.isLeader && (
+            <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800" title="팀 리더">
+              👑 리더
+            </span>
+          )}
           <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
             {typeLabel}
           </span>

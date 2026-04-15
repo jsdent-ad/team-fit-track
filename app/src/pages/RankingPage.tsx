@@ -138,6 +138,11 @@ export default function RankingPage() {
                       <span className="font-semibold text-neutral-900 truncate">
                         {row.member.name}
                       </span>
+                      {row.member.isLeader && (
+                        <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800">
+                          👑 리더
+                        </span>
+                      )}
                       <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
                         {typeLabel}
                       </span>

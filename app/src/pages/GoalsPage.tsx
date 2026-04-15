@@ -110,6 +110,11 @@ function MyMemberRow({ member }: { member: Member }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-semibold text-neutral-900 truncate">{member.name}</p>
+            {member.isLeader && (
+              <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800">
+                👑 리더
+              </span>
+            )}
             <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
               {GOAL_TYPE_LABEL[member.goalType ?? 'weight']}
             </span>
@@ -248,6 +253,11 @@ function OtherMemberRow({ member }: { member: Member }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-semibold text-neutral-900 truncate">{member.name}</p>
+            {member.isLeader && (
+              <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800">
+                👑 리더
+              </span>
+            )}
             <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
               {GOAL_TYPE_LABEL[member.goalType ?? 'weight']}
             </span>

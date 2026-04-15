@@ -9,6 +9,7 @@ export default function TeamOnboardingPage() {
 
   const [mode, setMode] = useState<Mode>('choose');
   const [teamName, setTeamName] = useState('');
+  const [teamCode, setTeamCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [issuedCode, setIssuedCode] = useState<string | null>(null);
   const [issuedTeamName, setIssuedTeamName] = useState<string | null>(null);
@@ -20,14 +21,13 @@ export default function TeamOnboardingPage() {
     if (busy) return;
     setError(null);
     setBusy(true);
-    const r = await createTeam(teamName);
+    const r = await createTeam(teamName, teamCode);
     setBusy(false);
     if (!r.ok) {
-      setError(
-        r.reason === 'team-name-empty'
-          ? '팀 이름을 입력해주세요'
-          : '팀 생성에 실패했어요. 잠시 후 다시 시도해주세요.'
-      );
+      if (r.reason === 'team-name-empty') setError('팀 이름을 입력해주세요');
+      else if (r.reason === 'code-invalid') setError(r.message ?? '팀 코드가 올바르지 않아요');
+      else if (r.reason === 'code-taken') setError('이미 사용 중인 팀 코드예요. 다른 코드로 시도해주세요.');
+      else setError('팀 생성에 실패했어요. 잠시 후 다시 시도해주세요.');
       return;
     }
     setIssuedCode(r.code);
@@ -88,8 +88,9 @@ export default function TeamOnboardingPage() {
               팀 코드로 참여하기
             </button>
             <p className="text-[11px] text-neutral-400 text-center pt-3 leading-relaxed">
-              팀을 만들면 6자리 코드가 생성돼요.<br />
-              이 코드를 팀원에게 공유하면 같은 팀에 합류할 수 있어요.
+              팀을 만들면 팀 코드를 직접 정할 수 있어요.<br />
+              이 코드를 팀원에게 공유하면 같은 팀에 합류할 수 있어요.<br />
+              <span className="text-neutral-500">처음 만든 사람이 팀 리더 👑</span>
             </p>
           </div>
         )}
@@ -118,6 +119,22 @@ export default function TeamOnboardingPage() {
                 className="w-full h-12 rounded-xl border border-neutral-200 px-4 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
                 autoFocus
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                팀 코드 (3~12자, 영문·숫자)
+              </label>
+              <input
+                type="text"
+                value={teamCode}
+                onChange={(e) => setTeamCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                placeholder="예: CREW2026"
+                maxLength={12}
+                className="w-full h-12 rounded-xl border border-neutral-200 px-4 font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+              />
+              <p className="text-[11px] text-neutral-400 mt-1">
+                팀원에게 공유할 코드예요. 팀원들은 이 코드로 참여합니다.
+              </p>
             </div>
             {error && (
               <div role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">

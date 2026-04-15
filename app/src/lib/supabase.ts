@@ -34,6 +34,7 @@ export type SupabaseSchema = {
     goal_unit: string;
     tour_completed: boolean;
     celebrated: boolean;
+    is_leader: boolean;
     created_at: string;
   };
   certifications: {
@@ -56,16 +57,19 @@ export type SupabaseSchema = {
   };
 };
 
-// Simple team code generator: 6-char alphanumeric, uppercase, unambiguous.
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-export function generateTeamCode(length = 6): string {
-  let out = '';
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  for (let i = 0; i < length; i++) {
-    out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+export const TEAM_CODE_MIN = 3;
+export const TEAM_CODE_MAX = 12;
+const TEAM_CODE_PATTERN = /^[A-Z0-9]+$/;
+
+export function validateTeamCode(code: string): { ok: true; normalized: string } | { ok: false; reason: string } {
+  const trimmed = code.trim().toUpperCase();
+  if (trimmed.length < TEAM_CODE_MIN || trimmed.length > TEAM_CODE_MAX) {
+    return { ok: false, reason: `팀 코드는 ${TEAM_CODE_MIN}~${TEAM_CODE_MAX}자여야 합니다` };
   }
-  return out;
+  if (!TEAM_CODE_PATTERN.test(trimmed)) {
+    return { ok: false, reason: '영문 대문자와 숫자만 사용할 수 있어요' };
+  }
+  return { ok: true, normalized: trimmed };
 }
 
 export async function hashPassword(raw: string): Promise<string> {
