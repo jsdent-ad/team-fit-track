@@ -72,12 +72,18 @@ function MyMemberRow({ member }: { member: Member }) {
     (s) => s.certifications.filter((c) => c.memberId === member.id).length
   );
 
+  // If this is a brand-new member with all-zero goal numbers, show the
+  // form blank so the user is forced to enter real values. Otherwise
+  // `goalStart="0"` + user typing `goalCurrent=65,goalTarget=65` would
+  // produce a fake 100% score.
+  const isBrandNew =
+    member.goalStart === 0 && member.goalCurrent === 0 && member.goalTarget === 0;
   const [draft, setDraft] = useState<Draft>({
     name: member.name,
     goalType: member.goalType ?? 'weight',
-    goalStart: String(member.goalStart ?? member.goalCurrent ?? ''),
-    goalTarget: String(member.goalTarget || ''),
-    goalCurrent: String(member.goalCurrent || ''),
+    goalStart: isBrandNew ? '' : String(member.goalStart ?? member.goalCurrent ?? ''),
+    goalTarget: isBrandNew ? '' : String(member.goalTarget || ''),
+    goalCurrent: isBrandNew ? '' : String(member.goalCurrent || ''),
     goalUnit: member.goalUnit || '',
   });
   const [editing, setEditing] = useState(false);
@@ -213,6 +219,9 @@ function MyMemberRow({ member }: { member: Member }) {
               />
             </label>
           </div>
+          <p className="text-[11px] text-neutral-400">
+            진행률 = (현재 − 시작) / (목표 − 시작). 시작치와 목표치가 같으면 진행률을 계산할 수 없어요.
+          </p>
           {error && (
             <p role="alert" className="text-xs text-red-600">
               {error}

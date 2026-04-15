@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { supabase, hashPassword, validateTeamCode, type SupabaseSchema } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { goalScore } from './score';
 
 export type GoalType = 'weight' | 'bodyFat' | 'skeletalMuscle';
 
@@ -202,11 +203,22 @@ export const useTeamStore = create<TeamState>()(
             (payload) => {
               if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
                 const m = rowToMember(payload.new as SupabaseSchema['members']);
-                set((s) => ({
-                  members: [...s.members.filter((x) => x.id !== m.id), m].sort((a, b) =>
-                    a.createdAt.localeCompare(b.createdAt)
-                  ),
-                }));
+                set((s) => {
+                  // Guard against Realtime races: if we locally believe this
+                  // member is celebrated, keep it true even if an older DB row
+                  // comes through. Server becomes authoritative only for
+                  // true→false transitions, which we never intentionally do.
+                  const prev = s.members.find((x) => x.id === m.id);
+                  const merged: Member =
+                    prev && prev.celebrated && !m.celebrated
+                      ? { ...m, celebrated: true }
+                      : m;
+                  return {
+                    members: [...s.members.filter((x) => x.id !== m.id), merged].sort(
+                      (a, b) => a.createdAt.localeCompare(b.createdAt)
+                    ),
+                  };
+                });
               } else if (payload.eventType === 'DELETE') {
                 const id = (payload.old as { id: string }).id;
                 set((s) => ({
@@ -354,7 +366,28 @@ export const useTeamStore = create<TeamState>()(
           const isLeader = existingList.length === 0; // first signup in the team
           const hash = await hashPassword(password);
           const current = Number.isFinite(goalCurrent ?? NaN) ? Number(goalCurrent) : 0;
+          const target = Number.isFinite(goalTarget ?? NaN) ? Number(goalTarget) : 0;
           const start = Number.isFinite(goalStart ?? NaN) ? Number(goalStart) : current;
+          // If the initial state happens to already score 100 (e.g. defaults
+          // all 0, or start==target==current), pre-mark celebrated=true so
+          // the CelebrationWatcher never mistakes the "brand new" state for a
+          // real achievement transition.
+          const initialScore = goalScore({
+            id: '',
+            teamId,
+            name: trimmed,
+            passwordHash: '',
+            goalType: goalType ?? 'weight',
+            goalStart: start,
+            goalTarget: target,
+            goalCurrent: current,
+            goalUnit: '',
+            tourCompleted: false,
+            celebrated: false,
+            isLeader,
+            createdAt: '',
+          });
+          const celebrated = initialScore === 100;
           const { data, error } = await supabase
             .from('members')
             .insert({
@@ -363,10 +396,11 @@ export const useTeamStore = create<TeamState>()(
               password_hash: hash,
               goal_type: goalType ?? 'weight',
               goal_start: start,
-              goal_target: Number.isFinite(goalTarget ?? NaN) ? Number(goalTarget) : 0,
+              goal_target: target,
               goal_current: current,
               goal_unit: (goalUnit && goalUnit.trim()) || GOAL_TYPE_DEFAULT_UNIT[goalType ?? 'weight'],
               is_leader: isLeader,
+              celebrated,
             })
             .select()
             .single();
@@ -411,13 +445,68 @@ export const useTeamStore = create<TeamState>()(
         updateMyProfile: async (patch) => {
           const id = get().currentMemberId;
           if (!id) return;
+          const prev = get().members.find((m) => m.id === id);
+          if (!prev) return;
+          const prevScore = goalScore(prev);
+
+          // Build the candidate next state, applying the same brand-new
+          // member auto-correction GoalsPage already does defensively:
+          // if the member has never set a starting value (start == current)
+          // or is a brand-new zeroed profile (start == 0 && current == 0),
+          // and the user is now entering a real current value, quietly set
+          // goalStart = new goalCurrent so the formula doesn't falsely
+          // report 100% because of stale zeros.
+          let nextGoalStart = patch.goalStart !== undefined ? patch.goalStart : prev.goalStart;
+          const nextGoalCurrent =
+            patch.goalCurrent !== undefined ? patch.goalCurrent : prev.goalCurrent;
+          const nextGoalTarget =
+            patch.goalTarget !== undefined ? patch.goalTarget : prev.goalTarget;
+
+          const isBrandNewStart =
+            (prev.goalStart === 0 && prev.goalCurrent === 0) ||
+            prev.goalStart === prev.goalCurrent;
+          const userDidNotTouchStart = patch.goalStart === undefined;
+          if (
+            isBrandNewStart &&
+            userDidNotTouchStart &&
+            patch.goalCurrent !== undefined &&
+            patch.goalCurrent !== prev.goalStart
+          ) {
+            nextGoalStart = patch.goalCurrent;
+          }
+
+          const nextMember: Member = {
+            ...prev,
+            ...(patch.name !== undefined ? { name: patch.name.trim() } : null),
+            ...(patch.goalType !== undefined ? { goalType: patch.goalType } : null),
+            ...(patch.goalUnit !== undefined ? { goalUnit: patch.goalUnit } : null),
+            goalStart: nextGoalStart,
+            goalCurrent: nextGoalCurrent,
+            goalTarget: nextGoalTarget,
+          };
+          const nextScore = goalScore(nextMember);
+
+          // Real "achievement transition" = prevScore < 100 AND nextScore === 100
+          // AND the user actually touched goalCurrent in this update.
+          // Anything else reaching 100 (target edits, stale-zero defaults,
+          // already-celebrated edits) must be suppressed silently.
+          const isRealAchievement =
+            prevScore < 100 &&
+            nextScore === 100 &&
+            patch.goalCurrent !== undefined;
+          const shouldAutoCelebrate = nextScore === 100 && !isRealAchievement;
+
           const payload: Record<string, unknown> = {};
           if (patch.name !== undefined) payload.name = patch.name.trim();
           if (patch.goalType !== undefined) payload.goal_type = patch.goalType;
-          if (patch.goalStart !== undefined) payload.goal_start = patch.goalStart;
+          payload.goal_start = nextGoalStart;
           if (patch.goalTarget !== undefined) payload.goal_target = patch.goalTarget;
           if (patch.goalCurrent !== undefined) payload.goal_current = patch.goalCurrent;
           if (patch.goalUnit !== undefined) payload.goal_unit = patch.goalUnit;
+          if (shouldAutoCelebrate && !prev.celebrated) {
+            payload.celebrated = true;
+          }
+
           const { data, error } = await supabase
             .from('members')
             .update(payload)
@@ -430,7 +519,10 @@ export const useTeamStore = create<TeamState>()(
           }
           if (data) {
             const m = rowToMember(data);
-            set((s) => ({ members: s.members.map((x) => (x.id === m.id ? m : x)) }));
+            // Preserve local celebrated=true if a realtime race could reset it.
+            const merged: Member =
+              prev.celebrated && !m.celebrated ? { ...m, celebrated: true } : m;
+            set((s) => ({ members: s.members.map((x) => (x.id === m.id ? merged : x)) }));
           }
         },
 

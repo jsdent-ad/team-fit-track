@@ -28,17 +28,23 @@ function RequireTeamAndMember({ children }: { children: React.ReactNode }) {
 
 function CelebrationWatcher() {
   const members = useTeamStore((s) => s.members);
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const markCelebrated = useTeamStore((s) => s.markCelebrated);
   const [celebrating, setCelebrating] = useState<Member | null>(null);
 
   useEffect(() => {
     if (celebrating) return;
-    const achiever = members.find((m) => goalScore(m) === 100 && !m.celebrated);
-    if (achiever) {
-      setCelebrating(achiever);
-      markCelebrated(achiever.id);
-    }
-  }, [members, celebrating, markCelebrated]);
+    if (!currentMemberId) return;
+    // Only trigger for the CURRENT user reaching 100. Other teammates'
+    // achievements must not pop up on my screen (those get celebrated on
+    // their own device when they do the transition).
+    const me = members.find((m) => m.id === currentMemberId);
+    if (!me) return;
+    if (goalScore(me) !== 100) return;
+    if (me.celebrated) return;
+    setCelebrating(me);
+    markCelebrated(me.id);
+  }, [members, celebrating, markCelebrated, currentMemberId]);
 
   return <CelebrationModal member={celebrating} onClose={() => setCelebrating(null)} />;
 }
