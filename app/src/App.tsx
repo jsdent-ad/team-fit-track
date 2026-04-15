@@ -11,6 +11,7 @@ import RankingPage from './pages/RankingPage';
 import CertifyPage from './pages/CertifyPage';
 import RecordsPage from './pages/RecordsPage';
 import GoalsPage from './pages/GoalsPage';
+import MemberDetailPage from './pages/MemberDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function RequireTeamAndMember({ children }: { children: React.ReactNode }) {
@@ -118,6 +119,14 @@ export default function App() {
           element={
             <RequireTeamAndMember>
               <GoalsPage />
+            </RequireTeamAndMember>
+          }
+        />
+        <Route
+          path="/member/:id"
+          element={
+            <RequireTeamAndMember>
+              <MemberDetailPage />
             </RequireTeamAndMember>
           }
         />

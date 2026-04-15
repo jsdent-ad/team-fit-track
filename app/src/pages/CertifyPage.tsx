@@ -179,16 +179,28 @@ export default function CertifyPage() {
           </p>
         ) : (
           <ul className="grid grid-cols-3 gap-2">
-            {todaysCerts.map((c) => (
-              <li key={c.id} className="aspect-square rounded-xl overflow-hidden border border-neutral-200">
-                <img
-                  src={c.imageDataUrl}
-                  alt={c.caption ?? '오늘 인증'}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </li>
-            ))}
+            {todaysCerts.map((c) => {
+              const d = new Date(c.createdAt);
+              const pad = (n: number) => n.toString().padStart(2, '0');
+              const label = Number.isNaN(d.getTime())
+                ? ''
+                : `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+              return (
+                <li key={c.id} className="flex flex-col gap-1">
+                  <div className="aspect-square rounded-xl overflow-hidden border border-neutral-200">
+                    <img
+                      src={c.imageDataUrl}
+                      alt={c.caption ?? '오늘 인증'}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                  <p className="text-[10px] text-neutral-500 text-center tabular-nums">
+                    {label}
+                  </p>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

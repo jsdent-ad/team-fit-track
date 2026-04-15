@@ -7,6 +7,7 @@ type Props = {
   canEdit: boolean;
   onUpdateCaption: (id: string, caption: string) => void;
   onRequestDelete: (id: string) => void;
+  onImageClick?: (cert: Certification) => void;
 };
 
 function formatTime(iso: string): string {
@@ -23,18 +24,43 @@ function formatTime(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${time}`;
 }
 
-export default function CertificationCard({ cert, memberName, canEdit, onUpdateCaption, onRequestDelete }: Props) {
+export default function CertificationCard({
+  cert,
+  memberName,
+  canEdit,
+  onUpdateCaption,
+  onRequestDelete,
+  onImageClick,
+}: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(cert.caption ?? '');
 
+  const imageInteractive = typeof onImageClick === 'function';
+
   return (
     <article className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
-      <img
-        src={cert.imageDataUrl}
-        alt={`${memberName} 인증 사진`}
-        className="w-full h-56 object-cover bg-neutral-100"
-        loading="lazy"
-      />
+      {imageInteractive ? (
+        <button
+          type="button"
+          onClick={() => onImageClick?.(cert)}
+          className="block w-full focus:outline-none focus:ring-2 focus:ring-accent/40"
+          aria-label={`${memberName} 인증 사진 크게 보기`}
+        >
+          <img
+            src={cert.imageDataUrl}
+            alt={`${memberName} 인증 사진`}
+            className="w-full h-56 object-cover bg-neutral-100"
+            loading="lazy"
+          />
+        </button>
+      ) : (
+        <img
+          src={cert.imageDataUrl}
+          alt={`${memberName} 인증 사진`}
+          className="w-full h-56 object-cover bg-neutral-100"
+          loading="lazy"
+        />
+      )}
       <div className="p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">

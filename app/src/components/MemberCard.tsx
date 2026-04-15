@@ -5,6 +5,7 @@ type Props = {
   row: RankingRow;
   rank: number;
   highlight?: boolean;
+  onClick?: (memberId: string) => void;
 };
 
 const medals: Record<number, string> = {
@@ -13,16 +14,13 @@ const medals: Record<number, string> = {
   3: '🥉',
 };
 
-export default function MemberCard({ row, rank, highlight = false }: Props) {
+export default function MemberCard({ row, rank, highlight = false, onClick }: Props) {
   const medal = medals[rank];
   const typeLabel = GOAL_TYPE_LABEL[row.member.goalType ?? 'weight'];
-  return (
-    <div
-      className={[
-        'flex items-center gap-3 p-4 bg-white rounded-2xl border shadow-sm',
-        highlight ? 'border-accent ring-1 ring-accent/30' : 'border-neutral-200',
-      ].join(' ')}
-    >
+  const clickable = typeof onClick === 'function';
+
+  const content = (
+    <>
       <div className="w-10 text-center text-xl font-bold text-neutral-700">
         {medal ?? `${rank}`}
       </div>
@@ -32,6 +30,11 @@ export default function MemberCard({ row, rank, highlight = false }: Props) {
           {row.member.isLeader && (
             <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-800" title="팀 리더">
               👑 리더
+            </span>
+          )}
+          {highlight && (
+            <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-accent text-white">
+              나
             </span>
           )}
           <span className="inline-flex items-center h-5 px-2 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
@@ -46,6 +49,27 @@ export default function MemberCard({ row, rank, highlight = false }: Props) {
         <div className="text-xl font-bold text-accent tabular-nums">{row.total}</div>
         <div className="text-xs text-neutral-500">점</div>
       </div>
-    </div>
+    </>
   );
+
+  const className = [
+    'w-full flex items-center gap-3 p-4 bg-white rounded-2xl border shadow-sm text-left',
+    highlight ? 'border-accent ring-1 ring-accent/30' : 'border-neutral-200',
+    clickable ? 'active:scale-[0.99] hover:bg-neutral-50 transition' : '',
+  ].join(' ');
+
+  if (clickable) {
+    return (
+      <button
+        type="button"
+        onClick={() => onClick?.(row.member.id)}
+        className={className}
+        aria-label={`${row.member.name} 상세 보기`}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }
