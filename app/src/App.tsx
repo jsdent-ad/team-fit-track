@@ -44,11 +44,20 @@ function CelebrationWatcher() {
 }
 
 function TourGate() {
-  const getCurrent = useTeamStore((s) => s.getCurrentMember);
+  const members = useTeamStore((s) => s.members);
+  const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const markTourCompleted = useTeamStore((s) => s.markTourCompleted);
-  const me = getCurrent();
-  if (!me || me.tourCompleted) return null;
-  return <OnboardingTour onDone={() => markTourCompleted()} />;
+  const [dismissed, setDismissed] = useState(false);
+  const me = members.find((m) => m.id === currentMemberId);
+  if (!me || me.tourCompleted || dismissed) return null;
+  return (
+    <OnboardingTour
+      onDone={() => {
+        setDismissed(true);
+        void markTourCompleted();
+      }}
+    />
+  );
 }
 
 export default function App() {

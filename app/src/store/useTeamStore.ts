@@ -479,6 +479,12 @@ export const useTeamStore = create<TeamState>()(
         markTourCompleted: async () => {
           const id = get().currentMemberId;
           if (!id) return;
+          // Optimistic local update so the overlay closes instantly.
+          set((s) => ({
+            members: s.members.map((m) =>
+              m.id === id ? { ...m, tourCompleted: true } : m
+            ),
+          }));
           const { error } = await supabase
             .from('members')
             .update({ tour_completed: true })
@@ -487,6 +493,12 @@ export const useTeamStore = create<TeamState>()(
         },
 
         markCelebrated: async (memberId) => {
+          // Optimistic so repeated renders don't re-trigger the modal.
+          set((s) => ({
+            members: s.members.map((m) =>
+              m.id === memberId ? { ...m, celebrated: true } : m
+            ),
+          }));
           const { error } = await supabase
             .from('members')
             .update({ celebrated: true })
