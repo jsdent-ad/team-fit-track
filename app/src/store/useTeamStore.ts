@@ -402,9 +402,20 @@ export const useTeamStore = create<TeamState>()(
           if (patch.goalTarget !== undefined) payload.goal_target = patch.goalTarget;
           if (patch.goalCurrent !== undefined) payload.goal_current = patch.goalCurrent;
           if (patch.goalUnit !== undefined) payload.goal_unit = patch.goalUnit;
-          // If goal changed, optionally reset celebrated flag when no longer at 100.
-          const { error } = await supabase.from('members').update(payload).eq('id', id);
-          if (error) console.error('[updateMyProfile]', error);
+          const { data, error } = await supabase
+            .from('members')
+            .update(payload)
+            .eq('id', id)
+            .select()
+            .single();
+          if (error) {
+            console.error('[updateMyProfile]', error);
+            throw error;
+          }
+          if (data) {
+            const m = rowToMember(data);
+            set((s) => ({ members: s.members.map((x) => (x.id === m.id ? m : x)) }));
+          }
         },
 
         removeMyself: async () => {
@@ -413,22 +424,42 @@ export const useTeamStore = create<TeamState>()(
           const { error } = await supabase.from('members').delete().eq('id', id);
           if (error) {
             console.error('[removeMyself]', error);
-            return;
+            throw error;
           }
-          set({ currentMemberId: null });
+          set((s) => ({
+            members: s.members.filter((m) => m.id !== id),
+            certifications: s.certifications.filter((c) => c.memberId !== id),
+            currentMemberId: null,
+          }));
         },
 
         addCertification: async ({ imageDataUrl, caption }) => {
           const teamId = get().currentTeamId;
           const memberId = get().currentMemberId;
           if (!teamId || !memberId) return;
-          const { error } = await supabase.from('certifications').insert({
-            team_id: teamId,
-            member_id: memberId,
-            image_data_url: imageDataUrl,
-            caption: caption ?? null,
-          });
-          if (error) console.error('[addCertification]', error);
+          const { data, error } = await supabase
+            .from('certifications')
+            .insert({
+              team_id: teamId,
+              member_id: memberId,
+              image_data_url: imageDataUrl,
+              caption: caption ?? null,
+            })
+            .select()
+            .single();
+          if (error) {
+            console.error('[addCertification]', error);
+            throw new Error(error.message);
+          }
+          if (data) {
+            const cert = rowToCert(data);
+            set((s) => ({
+              certifications: [
+                cert,
+                ...s.certifications.filter((c) => c.id !== cert.id),
+              ],
+            }));
+          }
         },
 
         updateMyCertification: async (id, patch) => {
@@ -436,11 +467,22 @@ export const useTeamStore = create<TeamState>()(
           if (!memberId) return;
           const target = get().certifications.find((c) => c.id === id);
           if (!target || target.memberId !== memberId) return;
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('certifications')
             .update({ caption: patch.caption ?? null })
-            .eq('id', id);
-          if (error) console.error('[updateMyCertification]', error);
+            .eq('id', id)
+            .select()
+            .single();
+          if (error) {
+            console.error('[updateMyCertification]', error);
+            throw error;
+          }
+          if (data) {
+            const cert = rowToCert(data);
+            set((s) => ({
+              certifications: s.certifications.map((c) => (c.id === cert.id ? cert : c)),
+            }));
+          }
         },
 
         removeMyCertification: async (id) => {
@@ -449,7 +491,13 @@ export const useTeamStore = create<TeamState>()(
           const target = get().certifications.find((c) => c.id === id);
           if (!target || target.memberId !== memberId) return;
           const { error } = await supabase.from('certifications').delete().eq('id', id);
-          if (error) console.error('[removeMyCertification]', error);
+          if (error) {
+            console.error('[removeMyCertification]', error);
+            throw error;
+          }
+          set((s) => ({
+            certifications: s.certifications.filter((c) => c.id !== id),
+          }));
         },
 
         setTeamChallenge: async (c) => {
@@ -463,17 +511,27 @@ export const useTeamStore = create<TeamState>()(
             start_date: c.startDate,
             end_date: c.endDate,
           };
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('team_challenges')
-            .upsert(payload, { onConflict: 'team_id' });
-          if (error) console.error('[setTeamChallenge]', error);
+            .upsert(payload, { onConflict: 'team_id' })
+            .select()
+            .single();
+          if (error) {
+            console.error('[setTeamChallenge]', error);
+            throw error;
+          }
+          if (data) set({ teamChallenge: rowToChallenge(data) });
         },
 
         deleteTeamChallenge: async () => {
           const teamId = get().currentTeamId;
           if (!teamId) return;
           const { error } = await supabase.from('team_challenges').delete().eq('team_id', teamId);
-          if (error) console.error('[deleteTeamChallenge]', error);
+          if (error) {
+            console.error('[deleteTeamChallenge]', error);
+            throw error;
+          }
+          set({ teamChallenge: null });
         },
 
         markTourCompleted: async () => {
