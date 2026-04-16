@@ -273,7 +273,7 @@ export default function MemberDetailPage() {
       <ConfirmDialog
         open={pendingDeleteId !== null}
         title="인증 삭제"
-        message={'정말 삭제하시겠습니까?\n삭제 시 해당 멤버의 인증 점수에서 10점이 차감됩니다.'}
+        message={'정말 삭제하시겠습니까?\n같은 날 다른 인증이 없다면 인증 점수 10점이 차감됩니다.'}
         confirmLabel="삭제"
         cancelLabel="취소"
         destructive

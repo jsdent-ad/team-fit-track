@@ -12,7 +12,14 @@ export function goalScore(m: Member): number {
 }
 
 export function certScore(certs: Certification[], memberId: string): number {
-  return certs.filter((c) => c.memberId === memberId).length * 10;
+  const days = new Set<string>();
+  for (const c of certs) {
+    if (c.memberId !== memberId) continue;
+    const d = new Date(c.createdAt);
+    if (Number.isNaN(d.getTime())) continue;
+    days.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+  }
+  return days.size * 10;
 }
 
 export function totalScore(m: Member, certs: Certification[]): number {
