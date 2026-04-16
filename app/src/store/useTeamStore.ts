@@ -676,7 +676,8 @@ export const useTeamStore = create<TeamState>()(
           const teamId = get().currentTeamId;
           if (!teamId) return;
           setCache({ loading: true, error: null });
-          const [membersRes, certsRes, chalRes] = await Promise.all([
+          const [teamRes, membersRes, certsRes, chalRes] = await Promise.all([
+            supabase.from('teams').select('id').eq('id', teamId).maybeSingle(),
             supabase.from('members').select('*').eq('team_id', teamId).order('created_at'),
             supabase.from('certifications').select('*').eq('team_id', teamId).order('created_at', { ascending: false }),
             supabase.from('team_challenges').select('*').eq('team_id', teamId).maybeSingle(),
@@ -686,12 +687,36 @@ export const useTeamStore = create<TeamState>()(
             setCache({ loading: false, error: '팀 데이터를 불러오지 못했어요' });
             return;
           }
+          // Session can go stale when the server drops a team or a member
+          // out from under the persisted localStorage state (DB reset, admin
+          // removal, etc.). Foreign-key writes like addCertification silently
+          // fail in that state, so clear the stale ids and let the route
+          // guards bounce the user to /team or /login.
+          if (!teamRes.data) {
+            set({
+              currentTeamId: null,
+              currentTeamCode: null,
+              currentTeamName: null,
+              currentMemberId: null,
+              members: [],
+              certifications: [],
+              teamChallenge: null,
+              loading: false,
+              error: null,
+            });
+            return;
+          }
+          const members = (membersRes.data ?? []).map(rowToMember);
+          const currentMemberId = get().currentMemberId;
+          const staleMember =
+            !!currentMemberId && !members.some((m) => m.id === currentMemberId);
           set({
-            members: (membersRes.data ?? []).map(rowToMember),
+            members,
             certifications: (certsRes.data ?? []).map(rowToCert),
             teamChallenge: chalRes.data ? rowToChallenge(chalRes.data) : null,
             loading: false,
             error: null,
+            ...(staleMember ? { currentMemberId: null } : {}),
           });
           subscribeRealtime(teamId);
         },
