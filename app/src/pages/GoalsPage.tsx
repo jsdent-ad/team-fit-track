@@ -7,7 +7,7 @@ import {
   GOAL_TYPE_DEFAULT_UNIT,
 } from '../store/useTeamStore';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { goalScore } from '../store/score';
+import { goalScore, certScore } from '../store/score';
 import TeamChallengeSection from '../components/TeamChallengeSection';
 
 type Draft = {
@@ -68,20 +68,18 @@ function GoalTypeSelect({
 function MyMemberRow({ member }: { member: Member }) {
   const updateMyProfile = useTeamStore((s) => s.updateMyProfile);
   const removeMyself = useTeamStore((s) => s.removeMyself);
-  const certsCount = useTeamStore(
-    (s) => s.certifications.filter((c) => c.memberId === member.id).length
-  );
+  const cert = useTeamStore((s) => certScore(s.certifications, member.id));
 
-  // If this is a brand-new member with all-zero goal numbers, show the
-  // form blank so the user is forced to enter real values. Otherwise
-  // `goalStart="0"` + user typing `goalCurrent=65,goalTarget=65` would
-  // produce a fake 100% score.
+  // Treat goalStart=0 the same as unset: weight / body-fat / muscle are
+  // never legitimately 0, and a stale zero there is what produced the
+  // fake 100% score bug.
+  const startUnset = !member.goalStart || member.goalStart <= 0;
   const isBrandNew =
-    member.goalStart === 0 && member.goalCurrent === 0 && member.goalTarget === 0;
+    startUnset && !member.goalCurrent && !member.goalTarget;
   const [draft, setDraft] = useState<Draft>({
     name: member.name,
     goalType: member.goalType ?? 'weight',
-    goalStart: isBrandNew ? '' : String(member.goalStart ?? member.goalCurrent ?? ''),
+    goalStart: startUnset ? '' : String(member.goalStart),
     goalTarget: isBrandNew ? '' : String(member.goalTarget || ''),
     goalCurrent: isBrandNew ? '' : String(member.goalCurrent || ''),
     goalUnit: member.goalUnit || '',
@@ -128,7 +126,7 @@ function MyMemberRow({ member }: { member: Member }) {
           <p className="text-xs text-neutral-500 mt-0.5">
             시작 {member.goalStart ?? member.goalCurrent} → 현재 {member.goalCurrent} / 목표{' '}
             {member.goalTarget} {member.goalUnit} · 목표 {goalScore(member)}점 · 인증{' '}
-            {certsCount * 10}점
+            {cert}점
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -253,9 +251,7 @@ function MyMemberRow({ member }: { member: Member }) {
 }
 
 function OtherMemberRow({ member }: { member: Member }) {
-  const certsCount = useTeamStore(
-    (s) => s.certifications.filter((c) => c.memberId === member.id).length
-  );
+  const cert = useTeamStore((s) => certScore(s.certifications, member.id));
   return (
     <article className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
       <div className="flex items-center justify-between gap-2">
@@ -274,7 +270,7 @@ function OtherMemberRow({ member }: { member: Member }) {
           <p className="text-xs text-neutral-500 mt-0.5">
             시작 {member.goalStart ?? member.goalCurrent} → 현재 {member.goalCurrent} / 목표{' '}
             {member.goalTarget} {member.goalUnit} · 목표 {goalScore(member)}점 · 인증{' '}
-            {certsCount * 10}점
+            {cert}점
           </p>
         </div>
         <span className="text-[10px] text-neutral-400 whitespace-nowrap">팀원</span>
