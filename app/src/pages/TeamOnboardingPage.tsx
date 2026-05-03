@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTeamStore } from '../store/useTeamStore';
 import { supabase } from '../lib/supabase';
 
-type Mode = 'choose' | 'create' | 'join' | 'created';
+type Mode = 'home' | 'create' | 'created';
 
 type TeamInfo = {
   id: string;
@@ -16,7 +16,7 @@ export default function TeamOnboardingPage() {
   const createTeam = useTeamStore((s) => s.createTeam);
   const joinTeam = useTeamStore((s) => s.joinTeam);
 
-  const [mode, setMode] = useState<Mode>('choose');
+  const [mode, setMode] = useState<Mode>('home');
   const [teamName, setTeamName] = useState('');
   const [teamCode, setTeamCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -26,10 +26,9 @@ export default function TeamOnboardingPage() {
   const [busy, setBusy] = useState(false);
 
   const [teams, setTeams] = useState<TeamInfo[]>([]);
-  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [loadingTeams, setLoadingTeams] = useState(true);
 
   useEffect(() => {
-    if (mode !== 'join') return;
     let cancelled = false;
     setLoadingTeams(true);
     (async () => {
@@ -69,7 +68,7 @@ export default function TeamOnboardingPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [mode]);
+  }, []);
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,30 +126,90 @@ export default function TeamOnboardingPage() {
             FT
           </div>
           <h1 className="text-2xl font-bold text-neutral-900">Team Fit-Track</h1>
-          <p className="text-sm text-neutral-500 mt-1">팀을 만들거나 참여해주세요</p>
+          <p className="text-sm text-neutral-500 mt-1">참여할 팀을 선택하세요</p>
         </div>
 
-        {mode === 'choose' && (
-          <div className="space-y-3">
+        {mode === 'home' && (
+          <div className="space-y-4">
+            {/* 팀 리스트 */}
+            {loadingTeams ? (
+              <div className="py-8 text-center text-sm text-neutral-400">팀 목록 불러오는 중…</div>
+            ) : teams.length === 0 ? (
+              <div className="py-6 text-center text-sm text-neutral-400 rounded-xl border border-dashed border-neutral-200">
+                아직 팀이 없어요
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {teams.map((t) => (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onJoin(t.code)}
+                      className="w-full text-left rounded-xl border border-neutral-200 px-4 py-3 hover:border-accent hover:bg-accent/5 active:scale-[0.99] transition disabled:opacity-60"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-neutral-900">{t.name}</span>
+                        <span className="text-[11px] font-mono text-neutral-400">{t.code}</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-neutral-500">
+                        <span>팀원 {t.memberCount}명</span>
+                        {t.challengeTitle && (
+                          <span className="truncate">🏆 {t.challengeTitle}</span>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* 코드 직접 입력 */}
+            <div className="relative flex items-center gap-2">
+              <div className="flex-1 h-px bg-neutral-200" />
+              <span className="text-xs text-neutral-400 shrink-0">코드 직접 입력</span>
+              <div className="flex-1 h-px bg-neutral-200" />
+            </div>
+
+            <form onSubmit={onJoinForm} className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="팀 코드"
+                className="flex-1 h-12 rounded-xl border border-neutral-200 px-4 font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+                maxLength={12}
+              />
+              <button
+                type="submit"
+                disabled={busy || !joinCode.trim()}
+                className="h-12 px-5 rounded-xl bg-accent text-white font-semibold active:scale-95 transition disabled:opacity-60"
+              >
+                {busy ? '…' : '참여'}
+              </button>
+            </form>
+
+            {error && (
+              <div role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">
+                {error}
+              </div>
+            )}
+
+            {/* 새 팀 만들기 */}
+            <div className="relative flex items-center gap-2 pt-1">
+              <div className="flex-1 h-px bg-neutral-200" />
+              <span className="text-xs text-neutral-400 shrink-0">또는</span>
+              <div className="flex-1 h-px bg-neutral-200" />
+            </div>
+
             <button
               type="button"
-              onClick={() => setMode('create')}
-              className="w-full h-14 rounded-xl bg-accent text-white font-semibold text-base active:scale-[0.98] transition"
+              onClick={() => { setMode('create'); setError(null); }}
+              className="w-full h-12 rounded-xl border border-neutral-300 text-neutral-700 font-semibold text-sm active:scale-[0.98] transition"
             >
               + 새 팀 만들기
             </button>
-            <button
-              type="button"
-              onClick={() => setMode('join')}
-              className="w-full h-14 rounded-xl border border-neutral-300 text-neutral-800 font-semibold text-base active:scale-[0.98] transition"
-            >
-              팀 참여하기
-            </button>
-            <p className="text-[11px] text-neutral-400 text-center pt-3 leading-relaxed">
-              팀을 만들면 숫자 코드를 직접 정할 수 있어요.<br />
-              이 코드를 팀원에게 공유하면 같은 팀에 합류할 수 있어요.<br />
-              <span className="text-neutral-500">처음 만든 사람이 팀 리더 👑</span>
-            </p>
           </div>
         )}
 
@@ -158,10 +217,7 @@ export default function TeamOnboardingPage() {
           <form onSubmit={onCreate} className="space-y-4">
             <button
               type="button"
-              onClick={() => {
-                setMode('choose');
-                setError(null);
-              }}
+              onClick={() => { setMode('home'); setError(null); }}
               className="text-sm text-neutral-500 mb-2"
             >
               ← 뒤로
@@ -209,86 +265,6 @@ export default function TeamOnboardingPage() {
               {busy ? '만드는 중…' : '팀 만들기'}
             </button>
           </form>
-        )}
-
-        {mode === 'join' && (
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('choose');
-                setError(null);
-              }}
-              className="text-sm text-neutral-500"
-            >
-              ← 뒤로
-            </button>
-
-            <p className="text-sm font-semibold text-neutral-700">참여할 팀 선택</p>
-
-            {loadingTeams ? (
-              <div className="py-8 text-center text-sm text-neutral-400">팀 목록 불러오는 중…</div>
-            ) : teams.length === 0 ? (
-              <div className="py-6 text-center text-sm text-neutral-400 rounded-xl border border-dashed border-neutral-200">
-                아직 팀이 없어요
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {teams.map((t) => (
-                  <li key={t.id}>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => onJoin(t.code)}
-                      className="w-full text-left rounded-xl border border-neutral-200 px-4 py-3 hover:border-accent hover:bg-accent/5 active:scale-[0.99] transition disabled:opacity-60"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-neutral-900">{t.name}</span>
-                        <span className="text-[11px] font-mono text-neutral-400">{t.code}</span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-neutral-500">
-                        <span>팀원 {t.memberCount}명</span>
-                        {t.challengeTitle && (
-                          <span className="truncate">🏆 {t.challengeTitle}</span>
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="relative flex items-center gap-2 mt-2">
-              <div className="flex-1 h-px bg-neutral-200" />
-              <span className="text-xs text-neutral-400 shrink-0">코드 직접 입력</span>
-              <div className="flex-1 h-px bg-neutral-200" />
-            </div>
-
-            <form onSubmit={onJoinForm} className="flex gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="팀 코드"
-                className="flex-1 h-12 rounded-xl border border-neutral-200 px-4 font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
-                maxLength={12}
-              />
-              <button
-                type="submit"
-                disabled={busy || !joinCode.trim()}
-                className="h-12 px-5 rounded-xl bg-accent text-white font-semibold active:scale-95 transition disabled:opacity-60"
-              >
-                {busy ? '…' : '참여'}
-              </button>
-            </form>
-
-            {error && (
-              <div role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">
-                {error}
-              </div>
-            )}
-          </div>
         )}
 
         {mode === 'created' && issuedCode && (
