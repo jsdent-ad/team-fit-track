@@ -167,6 +167,18 @@ export interface TeamState extends SessionSlice, CacheSlice {
   }>) => Promise<void>;
   removeMyself: () => Promise<void>;
 
+  // Leader member management
+  deleteMember: (memberId: string) => Promise<void>;
+  createMember: (input: {
+    name: string;
+    password: string;
+    goalType?: GoalType;
+    goalStart?: number;
+    goalTarget?: number;
+    goalCurrent?: number;
+    goalUnit?: string;
+  }) => Promise<AuthResult>;
+
   // Certifications
   addCertification: (input: { imageDataUrl: string; caption?: string; certDate?: string }) => Promise<void>;
   updateMyCertification: (id: string, patch: { caption?: string | null }) => Promise<void>;
@@ -539,6 +551,60 @@ export const useTeamStore = create<TeamState>()(
             certifications: s.certifications.filter((c) => c.memberId !== id),
             currentMemberId: null,
           }));
+        },
+
+        deleteMember: async (memberId) => {
+          const { error } = await supabase.from('members').delete().eq('id', memberId);
+          if (error) {
+            console.error('[deleteMember]', error);
+            throw error;
+          }
+          set((s) => ({
+            members: s.members.filter((m) => m.id !== memberId),
+            certifications: s.certifications.filter((c) => c.memberId !== memberId),
+          }));
+        },
+
+        createMember: async ({ name, password, goalType, goalStart, goalTarget, goalCurrent, goalUnit }) => {
+          const teamId = get().currentTeamId;
+          if (!teamId) return { ok: false, reason: 'network' };
+          const trimmed = name.trim();
+          if (!trimmed) return { ok: false, reason: 'name-empty' };
+          if (!password) return { ok: false, reason: 'password-empty' };
+          const { data: existing } = await supabase
+            .from('members')
+            .select('id,name')
+            .eq('team_id', teamId);
+          const existingList = existing ?? [];
+          const collide = existingList.some((m) => normalizeName(m.name) === normalizeName(trimmed));
+          if (collide) return { ok: false, reason: 'name-exists' };
+          const hash = await hashPassword(password);
+          const current = Number.isFinite(goalCurrent ?? NaN) ? Number(goalCurrent) : 0;
+          const target = Number.isFinite(goalTarget ?? NaN) ? Number(goalTarget) : 0;
+          const start = Number.isFinite(goalStart ?? NaN) ? Number(goalStart) : current;
+          const { data, error } = await supabase
+            .from('members')
+            .insert({
+              team_id: teamId,
+              name: trimmed,
+              password_hash: hash,
+              goal_type: goalType ?? 'weight',
+              goal_start: start,
+              goal_target: target,
+              goal_current: current,
+              goal_unit: (goalUnit && goalUnit.trim()) || GOAL_TYPE_DEFAULT_UNIT[goalType ?? 'weight'],
+              is_leader: false,
+              celebrated: false,
+            })
+            .select()
+            .single();
+          if (error || !data) {
+            console.error('[createMember]', error);
+            return { ok: false, reason: 'network' };
+          }
+          const m = rowToMember(data);
+          set((s) => ({ members: [...s.members.filter((x) => x.id !== m.id), m] }));
+          return { ok: true };
         },
 
         addCertification: async ({ imageDataUrl, caption, certDate }) => {

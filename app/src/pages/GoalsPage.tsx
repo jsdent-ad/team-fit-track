@@ -5,6 +5,7 @@ import {
   type GoalType,
   GOAL_TYPE_LABEL,
   GOAL_TYPE_DEFAULT_UNIT,
+  type AuthResult,
 } from '../store/useTeamStore';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { goalScore, certScore } from '../store/score';
@@ -250,8 +251,22 @@ function MyMemberRow({ member }: { member: Member }) {
   );
 }
 
-function OtherMemberRow({ member }: { member: Member }) {
+function OtherMemberRow({ member, isLeader }: { member: Member; isLeader: boolean }) {
   const cert = useTeamStore((s) => certScore(s.certifications, member.id));
+  const deleteMember = useTeamStore((s) => s.deleteMember);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const handleDelete = async () => {
+    setBusy(true);
+    try {
+      await deleteMember(member.id);
+    } finally {
+      setBusy(false);
+      setConfirmDelete(false);
+    }
+  };
+
   return (
     <article className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
       <div className="flex items-center justify-between gap-2">
@@ -273,9 +288,98 @@ function OtherMemberRow({ member }: { member: Member }) {
             {cert}점
           </p>
         </div>
-        <span className="text-[10px] text-neutral-400 whitespace-nowrap">팀원</span>
+        {isLeader ? (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            disabled={busy}
+            className="h-8 px-3 rounded-lg text-xs text-red-600 border border-red-200 active:scale-95 transition disabled:opacity-60 shrink-0"
+          >
+            삭제
+          </button>
+        ) : (
+          <span className="text-[10px] text-neutral-400 whitespace-nowrap">팀원</span>
+        )}
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="팀원 삭제"
+        message={`${member.name} 님을 삭제하면 해당 팀원의 인증 기록도 모두 삭제됩니다. 계속할까요?`}
+        confirmLabel="삭제"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </article>
+  );
+}
+
+function AddMemberForm({ onClose }: { onClose: () => void }) {
+  const createMember = useTeamStore((s) => s.createMember);
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    const r: AuthResult = await createMember({ name, password });
+    setBusy(false);
+    if (!r.ok) {
+      if (r.reason === 'name-empty') setError('이름을 입력해주세요');
+      else if (r.reason === 'password-empty') setError('비밀번호를 입력해주세요');
+      else if (r.reason === 'name-exists') setError('이미 같은 이름의 팀원이 있어요');
+      else setError('추가에 실패했어요. 다시 시도해주세요.');
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 space-y-3">
+      <p className="font-semibold text-sm text-neutral-800">팀원 추가</p>
+      <div>
+        <label className="block text-xs text-neutral-500 mb-1">이름</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="홍길동"
+          autoFocus
+          className="w-full h-11 rounded-xl border border-neutral-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-neutral-500 mb-1">비밀번호</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="팀원이 로그인할 비밀번호"
+          className="w-full h-11 rounded-xl border border-neutral-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+        />
+      </div>
+      {error && (
+        <p className="text-xs text-red-600">{error}</p>
+      )}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 h-11 rounded-xl border border-neutral-200 text-sm text-neutral-600 active:scale-95 transition"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          disabled={busy}
+          className="flex-1 h-11 rounded-xl bg-accent text-white text-sm font-semibold active:scale-95 transition disabled:opacity-60"
+        >
+          {busy ? '추가 중…' : '추가'}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -284,6 +388,9 @@ export default function GoalsPage() {
   const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const me = members.find((m) => m.id === currentMemberId);
   const others = members.filter((m) => m.id !== currentMemberId);
+  const amLeader = me?.isLeader ?? false;
+
+  const [showAddForm, setShowAddForm] = useState(false);
 
   return (
     <main className="px-5 pt-6 pb-24 max-w-xl mx-auto">
@@ -305,14 +412,54 @@ export default function GoalsPage() {
 
       {others.length > 0 && (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold text-neutral-500 mb-2">팀원 목표</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-neutral-500">팀원 목표</h2>
+            {amLeader && !showAddForm && (
+              <button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                className="text-xs text-accent font-medium active:scale-95 transition"
+              >
+                + 팀원 추가
+              </button>
+            )}
+          </div>
+          {showAddForm && (
+            <div className="mb-3">
+              <AddMemberForm onClose={() => setShowAddForm(false)} />
+            </div>
+          )}
           <ul className="space-y-3">
             {others.map((m) => (
               <li key={m.id}>
-                <OtherMemberRow member={m} />
+                <OtherMemberRow member={m} isLeader={amLeader} />
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {others.length === 0 && amLeader && (
+        <section className="mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-neutral-500">팀원</h2>
+            {!showAddForm && (
+              <button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                className="text-xs text-accent font-medium active:scale-95 transition"
+              >
+                + 팀원 추가
+              </button>
+            )}
+          </div>
+          {showAddForm ? (
+            <AddMemberForm onClose={() => setShowAddForm(false)} />
+          ) : (
+            <p className="text-sm text-neutral-400 py-6 text-center rounded-xl border border-dashed border-neutral-200">
+              아직 다른 팀원이 없어요
+            </p>
+          )}
         </section>
       )}
     </main>
