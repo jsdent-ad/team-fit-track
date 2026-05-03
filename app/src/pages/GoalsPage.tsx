@@ -386,20 +386,54 @@ function AddMemberForm({ onClose }: { onClose: () => void }) {
 export default function GoalsPage() {
   const members = useTeamStore((s) => s.members);
   const currentMemberId = useTeamStore((s) => s.currentMemberId);
+  const currentTeamName = useTeamStore((s) => s.currentTeamName);
+  const deleteTeam = useTeamStore((s) => s.deleteTeam);
   const me = members.find((m) => m.id === currentMemberId);
   const others = members.filter((m) => m.id !== currentMemberId);
   const amLeader = me?.isLeader ?? false;
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [confirmDeleteTeam, setConfirmDeleteTeam] = useState(false);
+  const [deletingTeam, setDeletingTeam] = useState(false);
+
+  const handleDeleteTeam = async () => {
+    setDeletingTeam(true);
+    try {
+      await deleteTeam();
+    } finally {
+      setDeletingTeam(false);
+      setConfirmDeleteTeam(false);
+    }
+  };
 
   return (
     <main className="px-5 pt-6 pb-24 max-w-xl mx-auto">
-      <header className="mb-5">
-        <h1 className="text-xl font-bold text-neutral-900">목표 설정</h1>
-        <p className="text-sm text-neutral-500 mt-0.5">
-          팀원 {members.length}명 · 내 목표만 수정 가능
-        </p>
+      <header className="mb-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">목표 설정</h1>
+          <p className="text-sm text-neutral-500 mt-0.5">
+            팀원 {members.length}명 · 내 목표만 수정 가능
+          </p>
+        </div>
+        {amLeader && (
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteTeam(true)}
+            className="text-xs text-red-500 border border-red-200 px-3 h-8 rounded-lg active:scale-95 transition"
+          >
+            팀 삭제
+          </button>
+        )}
       </header>
+
+      <ConfirmDialog
+        open={confirmDeleteTeam}
+        title="팀 삭제"
+        message={`'${currentTeamName}' 팀을 삭제하면 모든 팀원과 인증 기록이 함께 삭제됩니다. 계속할까요?`}
+        confirmLabel={deletingTeam ? '삭제 중…' : '삭제'}
+        onConfirm={handleDeleteTeam}
+        onCancel={() => setConfirmDeleteTeam(false)}
+      />
 
       <TeamChallengeSection />
 

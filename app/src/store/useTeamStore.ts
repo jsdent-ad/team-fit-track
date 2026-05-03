@@ -142,6 +142,7 @@ export interface TeamState extends SessionSlice, CacheSlice {
   createTeam: (name: string, code: string) => Promise<CreateTeamResult>;
   joinTeam: (code: string) => Promise<AuthResult>;
   leaveTeam: () => void;
+  deleteTeam: () => Promise<void>;
 
   // Auth
   signup: (input: {
@@ -345,6 +346,29 @@ export const useTeamStore = create<TeamState>()(
         },
 
         leaveTeam: () => {
+          if (realtimeChannel) {
+            supabase.removeChannel(realtimeChannel);
+            realtimeChannel = null;
+          }
+          set({
+            currentTeamId: null,
+            currentTeamCode: null,
+            currentTeamName: null,
+            currentMemberId: null,
+            members: [],
+            certifications: [],
+            teamChallenge: null,
+          });
+        },
+
+        deleteTeam: async () => {
+          const teamId = get().currentTeamId;
+          if (!teamId) return;
+          const { error } = await supabase.from('teams').delete().eq('id', teamId);
+          if (error) {
+            console.error('[deleteTeam]', error);
+            throw error;
+          }
           if (realtimeChannel) {
             supabase.removeChannel(realtimeChannel);
             realtimeChannel = null;
