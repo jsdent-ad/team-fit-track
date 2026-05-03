@@ -105,15 +105,25 @@ export default function CertifyPage() {
         <label className="block text-sm font-medium text-neutral-700 mb-1.5">
           인증 날짜
         </label>
-        <input
-          type="date"
-          value={certDate}
-          max={todayStr()}
-          onChange={(e) => {
-            if (e.target.value) setCertDate(e.target.value);
-          }}
-          className="w-full h-12 rounded-xl border border-neutral-200 px-4 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent text-sm"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={certDate}
+            onChange={(e) => {
+              if (e.target.value) setCertDate(e.target.value);
+            }}
+            className="flex-1 h-12 rounded-xl border border-neutral-200 px-4 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent text-sm"
+          />
+          {!isToday && (
+            <button
+              type="button"
+              onClick={() => setCertDate(todayStr())}
+              className="h-12 px-3 rounded-xl border border-neutral-200 text-xs text-neutral-500 whitespace-nowrap active:scale-95 transition"
+            >
+              오늘로
+            </button>
+          )}
+        </div>
       </div>
 
       {!preview ? (
