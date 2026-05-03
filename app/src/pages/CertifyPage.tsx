@@ -2,6 +2,11 @@ import { useMemo, useRef, useState } from 'react';
 import { useTeamStore } from '../store/useTeamStore';
 import { convertToWebP } from '../store/image';
 
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function CertifyPage() {
   const currentMemberId = useTeamStore((s) => s.currentMemberId);
   const members = useTeamStore((s) => s.members);
@@ -10,6 +15,7 @@ export default function CertifyPage() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [certDate, setCertDate] = useState<string>(todayStr);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,21 +27,23 @@ export default function CertifyPage() {
     [currentMemberId, members]
   );
 
-  const todaysCerts = useMemo(() => {
+  const selectedDateCerts = useMemo(() => {
     if (!myMember) return [];
-    const today = new Date();
+    const [year, month, day] = certDate.split('-').map(Number);
     return certifications
       .filter((c) => c.memberId === myMember.id)
       .filter((c) => {
         const d = new Date(c.createdAt);
         return (
-          d.getFullYear() === today.getFullYear() &&
-          d.getMonth() === today.getMonth() &&
-          d.getDate() === today.getDate()
+          d.getFullYear() === year &&
+          d.getMonth() + 1 === month &&
+          d.getDate() === day
         );
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [certifications, myMember]);
+  }, [certifications, myMember, certDate]);
+
+  const isToday = certDate === todayStr();
 
   const onPickFile = async (file: File | null) => {
     if (!file) return;
@@ -59,6 +67,7 @@ export default function CertifyPage() {
       await addCertification({
         imageDataUrl: preview,
         caption: caption.trim() || undefined,
+        certDate,
       });
       setPreview(null);
       setCaption('');
@@ -79,12 +88,33 @@ export default function CertifyPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const dateLabel = (() => {
+    if (isToday) return '오늘';
+    const [y, m, d] = certDate.split('-').map(Number);
+    return `${m}월 ${d}일`;
+  })();
+
   return (
     <main className="px-5 pt-6 pb-24 max-w-xl mx-auto">
       <header className="mb-5">
         <h1 className="text-xl font-bold text-neutral-900">오운완 인증</h1>
         <p className="text-sm text-neutral-500 mt-0.5">사진 한 장이면 +10점</p>
       </header>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+          인증 날짜
+        </label>
+        <input
+          type="date"
+          value={certDate}
+          max={todayStr()}
+          onChange={(e) => {
+            if (e.target.value) setCertDate(e.target.value);
+          }}
+          className="w-full h-12 rounded-xl border border-neutral-200 px-4 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent text-sm"
+        />
+      </div>
 
       {!preview ? (
         <div className="space-y-3">
@@ -172,14 +202,14 @@ export default function CertifyPage() {
       )}
 
       <section className="mt-8">
-        <h2 className="text-sm font-semibold text-neutral-500 mb-2">오늘의 내 인증</h2>
-        {todaysCerts.length === 0 ? (
+        <h2 className="text-sm font-semibold text-neutral-500 mb-2">{dateLabel} 내 인증</h2>
+        {selectedDateCerts.length === 0 ? (
           <p className="text-sm text-neutral-400 py-6 text-center rounded-xl border border-dashed border-neutral-200">
-            아직 오늘 인증이 없어요
+            {dateLabel} 인증이 없어요
           </p>
         ) : (
           <ul className="grid grid-cols-3 gap-2">
-            {todaysCerts.map((c) => {
+            {selectedDateCerts.map((c) => {
               const d = new Date(c.createdAt);
               const pad = (n: number) => n.toString().padStart(2, '0');
               const label = Number.isNaN(d.getTime())
@@ -190,7 +220,7 @@ export default function CertifyPage() {
                   <div className="aspect-square rounded-xl overflow-hidden border border-neutral-200">
                     <img
                       src={c.imageDataUrl}
-                      alt={c.caption ?? '오늘 인증'}
+                      alt={c.caption ?? '인증'}
                       className="w-full h-full object-cover"
                       loading="lazy"
                     />

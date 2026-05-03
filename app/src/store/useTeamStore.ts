@@ -168,7 +168,7 @@ export interface TeamState extends SessionSlice, CacheSlice {
   removeMyself: () => Promise<void>;
 
   // Certifications
-  addCertification: (input: { imageDataUrl: string; caption?: string }) => Promise<void>;
+  addCertification: (input: { imageDataUrl: string; caption?: string; certDate?: string }) => Promise<void>;
   updateMyCertification: (id: string, patch: { caption?: string | null }) => Promise<void>;
   removeMyCertification: (id: string) => Promise<void>;
 
@@ -541,18 +541,24 @@ export const useTeamStore = create<TeamState>()(
           }));
         },
 
-        addCertification: async ({ imageDataUrl, caption }) => {
+        addCertification: async ({ imageDataUrl, caption, certDate }) => {
           const teamId = get().currentTeamId;
           const memberId = get().currentMemberId;
           if (!teamId || !memberId) return;
+          const insertPayload: Record<string, unknown> = {
+            team_id: teamId,
+            member_id: memberId,
+            image_data_url: imageDataUrl,
+            caption: caption ?? null,
+          };
+          if (certDate) {
+            // Store as noon local time to avoid timezone-boundary issues
+            const d = new Date(certDate + 'T12:00:00');
+            insertPayload.created_at = d.toISOString();
+          }
           const { data, error } = await supabase
             .from('certifications')
-            .insert({
-              team_id: teamId,
-              member_id: memberId,
-              image_data_url: imageDataUrl,
-              caption: caption ?? null,
-            })
+            .insert(insertPayload)
             .select()
             .single();
           if (error) {

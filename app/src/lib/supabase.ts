@@ -59,15 +59,15 @@ export type SupabaseSchema = {
 
 export const TEAM_CODE_MIN = 3;
 export const TEAM_CODE_MAX = 12;
-const TEAM_CODE_PATTERN = /^[A-Z0-9]+$/;
+const TEAM_CODE_PATTERN = /^\d+$/;
 
 export function validateTeamCode(code: string): { ok: true; normalized: string } | { ok: false; reason: string } {
-  const trimmed = code.trim().toUpperCase();
+  const trimmed = code.trim();
   if (trimmed.length < TEAM_CODE_MIN || trimmed.length > TEAM_CODE_MAX) {
-    return { ok: false, reason: `팀 코드는 ${TEAM_CODE_MIN}~${TEAM_CODE_MAX}자여야 합니다` };
+    return { ok: false, reason: `팀 코드는 ${TEAM_CODE_MIN}~${TEAM_CODE_MAX}자리 숫자여야 합니다` };
   }
   if (!TEAM_CODE_PATTERN.test(trimmed)) {
-    return { ok: false, reason: '영문 대문자와 숫자만 사용할 수 있어요' };
+    return { ok: false, reason: '숫자만 사용할 수 있어요' };
   }
   return { ok: true, normalized: trimmed };
 }

@@ -1,11 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTeamStore } from '../store/useTeamStore';
+import { supabase } from '../lib/supabase';
 
-type Mode = 'choose' | 'create' | 'join' | 'created';
+type Mode = 'choose' | 'create' | 'join' | 'created' | 'challenge';
+
+type TeamInfo = {
+  id: string;
+  name: string;
+  code: string;
+  memberCount: number;
+  challengeTitle?: string;
+};
+
+type ChallengePreset = {
+  emoji: string;
+  title: string;
+  targetCount: number;
+  startDate: string;
+  endDate: string;
+};
+
+const CHALLENGE_PRESETS: ChallengePreset[] = [
+  { emoji: '🔥', title: '5월 오운완 챌린지', targetCount: 30, startDate: '2026-05-01', endDate: '2026-05-31' },
+  { emoji: '💪', title: '주 5회 운동 챌린지', targetCount: 22, startDate: '2026-05-01', endDate: '2026-05-31' },
+  { emoji: '🥗', title: '식단 인증 챌린지', targetCount: 20, startDate: '2026-05-01', endDate: '2026-05-31' },
+  { emoji: '👟', title: '매일 걷기 챌린지', targetCount: 31, startDate: '2026-05-01', endDate: '2026-05-31' },
+  { emoji: '🏆', title: '100회 인증 대챌린지', targetCount: 100, startDate: '2026-05-01', endDate: '2026-07-31' },
+];
 
 export default function TeamOnboardingPage() {
   const createTeam = useTeamStore((s) => s.createTeam);
   const joinTeam = useTeamStore((s) => s.joinTeam);
+  const setTeamChallenge = useTeamStore((s) => s.setTeamChallenge);
 
   const [mode, setMode] = useState<Mode>('choose');
   const [teamName, setTeamName] = useState('');
@@ -15,6 +41,52 @@ export default function TeamOnboardingPage() {
   const [issuedTeamName, setIssuedTeamName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [teams, setTeams] = useState<TeamInfo[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
+  useEffect(() => {
+    if (mode !== 'join') return;
+    let cancelled = false;
+    setLoadingTeams(true);
+    (async () => {
+      const { data: teamsData } = await supabase
+        .from('teams')
+        .select('id, name, code, created_at')
+        .order('created_at');
+      if (cancelled || !teamsData) {
+        setLoadingTeams(false);
+        return;
+      }
+      const enriched = await Promise.all(
+        teamsData.map(async (t) => {
+          const [{ count }, { data: chal }] = await Promise.all([
+            supabase
+              .from('members')
+              .select('id', { count: 'exact', head: true })
+              .eq('team_id', t.id),
+            supabase
+              .from('team_challenges')
+              .select('title')
+              .eq('team_id', t.id)
+              .maybeSingle(),
+          ]);
+          return {
+            id: t.id,
+            name: t.name,
+            code: t.code,
+            memberCount: count ?? 0,
+            challengeTitle: chal?.title ?? undefined,
+          };
+        })
+      );
+      if (!cancelled) {
+        setTeams(enriched);
+        setLoadingTeams(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mode]);
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,12 +107,11 @@ export default function TeamOnboardingPage() {
     setMode('created');
   };
 
-  const onJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onJoin = async (code: string) => {
     if (busy) return;
     setError(null);
     setBusy(true);
-    const r = await joinTeam(joinCode);
+    const r = await joinTeam(code);
     setBusy(false);
     if (!r.ok) {
       setError(
@@ -51,6 +122,11 @@ export default function TeamOnboardingPage() {
     }
   };
 
+  const onJoinForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onJoin(joinCode);
+  };
+
   const copyCode = async () => {
     if (!issuedCode) return;
     try {
@@ -58,6 +134,26 @@ export default function TeamOnboardingPage() {
     } catch {
       // ignore
     }
+  };
+
+  const onPickChallenge = async (preset: ChallengePreset) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await setTeamChallenge({
+        id: '',
+        teamId: '',
+        title: preset.title,
+        targetCount: preset.targetCount,
+        themeEmoji: preset.emoji,
+        startDate: preset.startDate,
+        endDate: preset.endDate,
+      });
+    } catch {
+      // ignore — challenge can be set later by the leader
+    }
+    setBusy(false);
+    window.location.href = '/';
   };
 
   return (
@@ -85,10 +181,10 @@ export default function TeamOnboardingPage() {
               onClick={() => setMode('join')}
               className="w-full h-14 rounded-xl border border-neutral-300 text-neutral-800 font-semibold text-base active:scale-[0.98] transition"
             >
-              팀 코드로 참여하기
+              팀 참여하기
             </button>
             <p className="text-[11px] text-neutral-400 text-center pt-3 leading-relaxed">
-              팀을 만들면 팀 코드를 직접 정할 수 있어요.<br />
+              팀을 만들면 숫자 코드를 직접 정할 수 있어요.<br />
               이 코드를 팀원에게 공유하면 같은 팀에 합류할 수 있어요.<br />
               <span className="text-neutral-500">처음 만든 사람이 팀 리더 👑</span>
             </p>
@@ -122,18 +218,19 @@ export default function TeamOnboardingPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1.5">
-                팀 코드 (3~12자, 영문·숫자)
+                팀 코드 (3~12자리 숫자)
               </label>
               <input
                 type="text"
+                inputMode="numeric"
                 value={teamCode}
-                onChange={(e) => setTeamCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                placeholder="예: CREW2026"
+                onChange={(e) => setTeamCode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="예: 20260501"
                 maxLength={12}
                 className="w-full h-12 rounded-xl border border-neutral-200 px-4 font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
               />
               <p className="text-[11px] text-neutral-400 mt-1">
-                팀원에게 공유할 코드예요. 팀원들은 이 코드로 참여합니다.
+                팀원에게 공유할 숫자 코드예요. 팀원들은 이 코드로 참여합니다.
               </p>
             </div>
             {error && (
@@ -152,45 +249,83 @@ export default function TeamOnboardingPage() {
         )}
 
         {mode === 'join' && (
-          <form onSubmit={onJoin} className="space-y-4">
+          <div className="space-y-4">
             <button
               type="button"
               onClick={() => {
                 setMode('choose');
                 setError(null);
               }}
-              className="text-sm text-neutral-500 mb-2"
+              className="text-sm text-neutral-500"
             >
               ← 뒤로
             </button>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1.5">
-                팀 코드 (6자리)
-              </label>
+
+            <p className="text-sm font-semibold text-neutral-700">참여할 팀 선택</p>
+
+            {loadingTeams ? (
+              <div className="py-8 text-center text-sm text-neutral-400">팀 목록 불러오는 중…</div>
+            ) : teams.length === 0 ? (
+              <div className="py-6 text-center text-sm text-neutral-400 rounded-xl border border-dashed border-neutral-200">
+                아직 팀이 없어요
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {teams.map((t) => (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onJoin(t.code)}
+                      className="w-full text-left rounded-xl border border-neutral-200 px-4 py-3 hover:border-accent hover:bg-accent/5 active:scale-[0.99] transition disabled:opacity-60"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-neutral-900">{t.name}</span>
+                        <span className="text-[11px] font-mono text-neutral-400">{t.code}</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-neutral-500">
+                        <span>팀원 {t.memberCount}명</span>
+                        {t.challengeTitle && (
+                          <span className="truncate">🏆 {t.challengeTitle}</span>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="relative flex items-center gap-2 mt-2">
+              <div className="flex-1 h-px bg-neutral-200" />
+              <span className="text-xs text-neutral-400 shrink-0">코드 직접 입력</span>
+              <div className="flex-1 h-px bg-neutral-200" />
+            </div>
+
+            <form onSubmit={onJoinForm} className="flex gap-2">
               <input
                 type="text"
-                inputMode="text"
+                inputMode="numeric"
                 value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="ABC234"
-                className="w-full h-12 rounded-xl border border-neutral-200 px-4 tracking-[0.3em] font-mono text-center text-lg focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
-                maxLength={6}
-                autoFocus
+                onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="팀 코드"
+                className="flex-1 h-12 rounded-xl border border-neutral-200 px-4 font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+                maxLength={12}
               />
-            </div>
+              <button
+                type="submit"
+                disabled={busy || !joinCode.trim()}
+                className="h-12 px-5 rounded-xl bg-accent text-white font-semibold active:scale-95 transition disabled:opacity-60"
+              >
+                {busy ? '…' : '참여'}
+              </button>
+            </form>
+
             {error && (
               <div role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">
                 {error}
               </div>
             )}
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full h-12 rounded-xl bg-accent text-white font-semibold active:scale-95 transition disabled:opacity-60"
-            >
-              {busy ? '확인 중…' : '참여하기'}
-            </button>
-          </form>
+          </div>
         )}
 
         {mode === 'created' && issuedCode && (
@@ -212,17 +347,55 @@ export default function TeamOnboardingPage() {
             </div>
             <p className="text-xs text-neutral-500 text-center leading-relaxed">
               이 코드를 팀원에게 공유하세요.<br />
-              다음 화면에서 본인 이름과 비밀번호로 가입하면 돼요.
+              다음 단계에서 팀 챌린지를 선택할 수 있어요.
             </p>
             <button
               type="button"
-              onClick={() => {
-                // Team is already set in store via createTeam; move to signup.
-                window.location.href = '/';
-              }}
+              onClick={() => setMode('challenge')}
               className="w-full h-12 rounded-xl bg-accent text-white font-semibold active:scale-95"
             >
-              다음 — 가입하기
+              다음 — 챌린지 선택하기
+            </button>
+          </div>
+        )}
+
+        {mode === 'challenge' && (
+          <div className="space-y-4">
+            <div className="text-center mb-2">
+              <p className="font-semibold text-neutral-900">챌린지를 선택하세요</p>
+              <p className="text-xs text-neutral-500 mt-1">팀원 모두가 함께 도전할 챌린지예요</p>
+            </div>
+
+            <ul className="space-y-2">
+              {CHALLENGE_PRESETS.map((preset) => (
+                <li key={preset.title}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onPickChallenge(preset)}
+                    className="w-full text-left rounded-xl border border-neutral-200 px-4 py-3 hover:border-accent hover:bg-accent/5 active:scale-[0.99] transition disabled:opacity-60"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{preset.emoji}</span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-neutral-900 text-sm">{preset.title}</p>
+                        <p className="text-xs text-neutral-400 mt-0.5">
+                          목표 {preset.targetCount}회 · {preset.startDate} ~ {preset.endDate}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => { window.location.href = '/'; }}
+              className="w-full h-11 rounded-xl border border-neutral-200 text-neutral-500 text-sm font-medium active:scale-95 transition disabled:opacity-60"
+            >
+              건너뛰기 (나중에 설정)
             </button>
           </div>
         )}

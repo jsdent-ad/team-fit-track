@@ -46,8 +46,8 @@ export default function LoginPage() {
           setError('비밀번호 확인이 일치하지 않습니다');
           return;
         }
-        if (password.length < 4) {
-          setError('비밀번호는 4자 이상이어야 합니다');
+        if (!/^\d{4}$/.test(password)) {
+          setError('비밀번호는 숫자 4자리여야 합니다');
           return;
         }
         const r = await signup({
@@ -153,11 +153,13 @@ export default function LoginPage() {
             <input
               id="login-password"
               type="password"
+              inputMode="numeric"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="4자 이상"
-              className="w-full h-12 rounded-xl border border-neutral-200 px-4 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+              onChange={(e) => setPassword(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="숫자 4자리"
+              maxLength={4}
+              className="w-full h-12 rounded-xl border border-neutral-200 px-4 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent tracking-widest text-center text-lg"
             />
           </div>
 
@@ -170,10 +172,13 @@ export default function LoginPage() {
                 <input
                   id="login-password-confirm"
                   type="password"
+                  inputMode="numeric"
                   autoComplete="new-password"
                   value={passwordConfirm}
-                  onChange={(e) => setPasswordConfirm(e.target.value)}
-                  className="w-full h-12 rounded-xl border border-neutral-200 px-4 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+                  onChange={(e) => setPasswordConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="숫자 4자리"
+                  maxLength={4}
+                  className="w-full h-12 rounded-xl border border-neutral-200 px-4 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent tracking-widest text-center text-lg"
                 />
               </div>
 
