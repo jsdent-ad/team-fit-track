@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTeamStore } from '../store/useTeamStore';
 import { supabase } from '../lib/supabase';
 
-type Mode = 'choose' | 'create' | 'join' | 'created' | 'challenge';
+type Mode = 'choose' | 'create' | 'join' | 'created';
 
 type TeamInfo = {
   id: string;
@@ -12,26 +12,9 @@ type TeamInfo = {
   challengeTitle?: string;
 };
 
-type ChallengePreset = {
-  emoji: string;
-  title: string;
-  targetCount: number;
-  startDate: string;
-  endDate: string;
-};
-
-const CHALLENGE_PRESETS: ChallengePreset[] = [
-  { emoji: '🔥', title: '5월 오운완 챌린지', targetCount: 30, startDate: '2026-05-01', endDate: '2026-05-31' },
-  { emoji: '💪', title: '주 5회 운동 챌린지', targetCount: 22, startDate: '2026-05-01', endDate: '2026-05-31' },
-  { emoji: '🥗', title: '식단 인증 챌린지', targetCount: 20, startDate: '2026-05-01', endDate: '2026-05-31' },
-  { emoji: '👟', title: '매일 걷기 챌린지', targetCount: 31, startDate: '2026-05-01', endDate: '2026-05-31' },
-  { emoji: '🏆', title: '100회 인증 대챌린지', targetCount: 100, startDate: '2026-05-01', endDate: '2026-07-31' },
-];
-
 export default function TeamOnboardingPage() {
   const createTeam = useTeamStore((s) => s.createTeam);
   const joinTeam = useTeamStore((s) => s.joinTeam);
-  const setTeamChallenge = useTeamStore((s) => s.setTeamChallenge);
 
   const [mode, setMode] = useState<Mode>('choose');
   const [teamName, setTeamName] = useState('');
@@ -134,26 +117,6 @@ export default function TeamOnboardingPage() {
     } catch {
       // ignore
     }
-  };
-
-  const onPickChallenge = async (preset: ChallengePreset) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await setTeamChallenge({
-        id: '',
-        teamId: '',
-        title: preset.title,
-        targetCount: preset.targetCount,
-        themeEmoji: preset.emoji,
-        startDate: preset.startDate,
-        endDate: preset.endDate,
-      });
-    } catch {
-      // ignore — challenge can be set later by the leader
-    }
-    setBusy(false);
-    window.location.href = '/';
   };
 
   return (
@@ -347,55 +310,14 @@ export default function TeamOnboardingPage() {
             </div>
             <p className="text-xs text-neutral-500 text-center leading-relaxed">
               이 코드를 팀원에게 공유하세요.<br />
-              다음 단계에서 팀 챌린지를 선택할 수 있어요.
+              다음 화면에서 본인 이름과 비밀번호로 가입하면 돼요.
             </p>
             <button
               type="button"
-              onClick={() => setMode('challenge')}
+              onClick={() => { window.location.href = '/'; }}
               className="w-full h-12 rounded-xl bg-accent text-white font-semibold active:scale-95"
             >
-              다음 — 챌린지 선택하기
-            </button>
-          </div>
-        )}
-
-        {mode === 'challenge' && (
-          <div className="space-y-4">
-            <div className="text-center mb-2">
-              <p className="font-semibold text-neutral-900">챌린지를 선택하세요</p>
-              <p className="text-xs text-neutral-500 mt-1">팀원 모두가 함께 도전할 챌린지예요</p>
-            </div>
-
-            <ul className="space-y-2">
-              {CHALLENGE_PRESETS.map((preset) => (
-                <li key={preset.title}>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onPickChallenge(preset)}
-                    className="w-full text-left rounded-xl border border-neutral-200 px-4 py-3 hover:border-accent hover:bg-accent/5 active:scale-[0.99] transition disabled:opacity-60"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{preset.emoji}</span>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-neutral-900 text-sm">{preset.title}</p>
-                        <p className="text-xs text-neutral-400 mt-0.5">
-                          목표 {preset.targetCount}회 · {preset.startDate} ~ {preset.endDate}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => { window.location.href = '/'; }}
-              className="w-full h-11 rounded-xl border border-neutral-200 text-neutral-500 text-sm font-medium active:scale-95 transition disabled:opacity-60"
-            >
-              건너뛰기 (나중에 설정)
+              다음 — 가입하기
             </button>
           </div>
         )}
