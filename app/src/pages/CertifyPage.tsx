@@ -90,7 +90,7 @@ export default function CertifyPage() {
 
   const dateLabel = (() => {
     if (isToday) return '오늘';
-    const [y, m, d] = certDate.split('-').map(Number);
+    const [, m, d] = certDate.split('-').map(Number);
     return `${m}월 ${d}일`;
   })();
 
